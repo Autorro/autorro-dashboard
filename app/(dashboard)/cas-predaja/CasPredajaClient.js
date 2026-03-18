@@ -2,33 +2,84 @@
 
 import { useEffect, useState } from "react";
 
-const OFFICES = {
-  "Všetky": null,
-  "BB": ["Dominika Kompaniková", "Dominka Kompaníková", "Milan Kováč", "Andrej Čík", "Tomáš Urbán", "Tomás Urban", "Dávid Juhaniak", "David Juhaniak"],
-  "TT": ["Bálint Forró", "Bálint Forro", "Tomáš Opálek", "Karolína Lisická", "Martin Blažek", "Lukáš Krommel"],
-  "NR": ["Martin Petráš", "Dávid Kalužák", "David Kalužák", "Daniel Kádek", "Gabriela Šodorová", "Dávid Čintala"],
-  "BA": ["Milan Švorc", "Ján Mikuš", "Richard Kiss", "Karin Harvan", "Matej Hromada", "Milan Pulc", "Martin Bošeľa", "Peter Maťo", "Jonathán Pavelka", "Matej Klačko", "Dominik Ďurčo"],
-  "TN": ["Libor Koníček", "Tomáš Otrubný", "Peter Mjartan", "Martin Mečiar", "Ján Skovajsa", "Tomáš Kučerka", "Patrik Frič"],
-  "ZA": ["Tomáš Smieško", "Daniel Jašek", "Vladko Hess", "Wlodzimierz Hess", "Irena Varadová", "Matej Gažo", "Veronika Maťková", "Tomáš Ďurana"],
-  "PP": ["Sebastián Čuban", "Tomáš Matta"],
-  "KE": ["Ján Tej", "Adrián Šomšág", "Viliam Baran", "Jaroslav Hažlinský", "Martin Živčák", "Ján Slivka"],
+// Each broker is { display, aliases } — aliases are all name variants in Pipedrive
+const BROKER_GROUPS = {
+  "BB": [
+    { display: "Dominika Kompaniková", aliases: ["Dominika Kompaniková", "Dominka Kompaníková"] },
+    { display: "Milan Kováč", aliases: ["Milan Kováč"] },
+    { display: "Andrej Čík", aliases: ["Andrej Čík"] },
+    { display: "Tomáš Urbán", aliases: ["Tomáš Urbán", "Tomás Urban"] },
+    { display: "Dávid Juhaniak", aliases: ["Dávid Juhaniak", "David Juhaniak"] },
+  ],
+  "TT": [
+    { display: "Bálint Forró", aliases: ["Bálint Forró", "Bálint Forro"] },
+    { display: "Tomáš Opálek", aliases: ["Tomáš Opálek"] },
+    { display: "Karolína Lisická", aliases: ["Karolína Lisická"] },
+    { display: "Martin Blažek", aliases: ["Martin Blažek"] },
+    { display: "Lukáš Krommel", aliases: ["Lukáš Krommel"] },
+  ],
+  "NR": [
+    { display: "Martin Petráš", aliases: ["Martin Petráš"] },
+    { display: "Dávid Kalužák", aliases: ["Dávid Kalužák", "David Kalužák"] },
+    { display: "Daniel Kádek", aliases: ["Daniel Kádek"] },
+    { display: "Gabriela Šodorová", aliases: ["Gabriela Šodorová"] },
+    { display: "Dávid Čintala", aliases: ["Dávid Čintala"] },
+  ],
+  "BA": [
+    { display: "Milan Švorc", aliases: ["Milan Švorc"] },
+    { display: "Ján Mikuš", aliases: ["Ján Mikuš"] },
+    { display: "Richard Kiss", aliases: ["Richard Kiss"] },
+    { display: "Karin Harvan", aliases: ["Karin Harvan"] },
+    { display: "Matej Hromada", aliases: ["Matej Hromada"] },
+    { display: "Milan Pulc", aliases: ["Milan Pulc"] },
+    { display: "Martin Bošeľa", aliases: ["Martin Bošeľa"] },
+    { display: "Peter Maťo", aliases: ["Peter Maťo"] },
+    { display: "Jonathán Pavelka", aliases: ["Jonathán Pavelka"] },
+    { display: "Matej Klačko", aliases: ["Matej Klačko"] },
+    { display: "Dominik Ďurčo", aliases: ["Dominik Ďurčo"] },
+  ],
+  "TN": [
+    { display: "Libor Koníček", aliases: ["Libor Koníček"] },
+    { display: "Tomáš Otrubný", aliases: ["Tomáš Otrubný"] },
+    { display: "Peter Mjartan", aliases: ["Peter Mjartan"] },
+    { display: "Martin Mečiar", aliases: ["Martin Mečiar"] },
+    { display: "Ján Skovajsa", aliases: ["Ján Skovajsa"] },
+    { display: "Tomáš Kučerka", aliases: ["Tomáš Kučerka"] },
+    { display: "Patrik Frič", aliases: ["Patrik Frič"] },
+  ],
+  "ZA": [
+    { display: "Tomáš Smieško", aliases: ["Tomáš Smieško"] },
+    { display: "Daniel Jašek", aliases: ["Daniel Jašek"] },
+    { display: "Vladko Hess", aliases: ["Vladko Hess", "Wlodzimierz Hess"] },
+    { display: "Irena Varadová", aliases: ["Irena Varadová"] },
+    { display: "Matej Gažo", aliases: ["Matej Gažo"] },
+    { display: "Veronika Maťková", aliases: ["Veronika Maťková"] },
+    { display: "Tomáš Ďurana", aliases: ["Tomáš Ďurana"] },
+  ],
+  "PP": [
+    { display: "Sebastián Čuban", aliases: ["Sebastián Čuban"] },
+    { display: "Tomáš Matta", aliases: ["Tomáš Matta"] },
+  ],
+  "KE": [
+    { display: "Ján Tej", aliases: ["Ján Tej"] },
+    { display: "Adrián Šomšág", aliases: ["Adrián Šomšág"] },
+    { display: "Viliam Baran", aliases: ["Viliam Baran"] },
+    { display: "Jaroslav Hažlinský", aliases: ["Jaroslav Hažlinský"] },
+    { display: "Martin Živčák", aliases: ["Martin Živčák"] },
+    { display: "Ján Slivka", aliases: ["Ján Slivka"] },
+  ],
 };
 
 const EXCLUDE = ["Development", "Tomáš Martiš", "Miroslav Hrehor", "Peter Hudec", "Jaroslav Kováč"];
 
-// Build canonical name map (first alias = display name)
-const CANONICAL = {};
-for (const names of Object.values(OFFICES)) {
-  if (!names) continue;
-  const display = names[0];
-  for (const n of names) {
-    CANONICAL[n.trim().toLowerCase()] = display;
+// Build alias → display lookup
+const ALIAS_TO_DISPLAY = {};
+for (const brokers of Object.values(BROKER_GROUPS)) {
+  for (const { display, aliases } of brokers) {
+    for (const a of aliases) {
+      ALIAS_TO_DISPLAY[a.trim().toLowerCase()] = display;
+    }
   }
-}
-
-function canonicalize(name) {
-  if (!name) return null;
-  return CANONICAL[name.trim().toLowerCase()] || name;
 }
 
 function getSpeed(avg) {
@@ -50,17 +101,14 @@ function SpeedBar({ avg, dark }) {
   );
 }
 
-// Get unique canonical broker names for an office (preserving OFFICES order)
-function getBrokerNames(office) {
-  const names = OFFICES[office];
-  if (!names) return [];
-  const seen = new Set();
-  const result = [];
-  for (const n of names) {
-    const c = CANONICAL[n.trim().toLowerCase()] || n;
-    if (!seen.has(c)) { seen.add(c); result.push(c); }
+function getBrokers(office) {
+  if (office === "Všetky") {
+    const seen = new Set();
+    return Object.values(BROKER_GROUPS).flatMap(list =>
+      list.filter(b => { if (seen.has(b.display)) return false; seen.add(b.display); return true; })
+    );
   }
-  return result;
+  return BROKER_GROUPS[office] || [];
 }
 
 export default function CasPredajaClient() {
@@ -74,12 +122,28 @@ export default function CasPredajaClient() {
     fetch("/api/cas-predaja")
       .then(r => r.json())
       .then(data => {
-        // Merge by canonical name, keep row with most deals
-        const map = {};
+        // Aggregate by display name (merge aliases)
+        const raw = {};
         for (const row of data) {
-          const c = canonicalize(row.owner_name);
-          if (!c || EXCLUDE.includes(c)) continue;
-          if (!map[c] || row.count > map[c].count) map[c] = row;
+          const display = ALIAS_TO_DISPLAY[row.owner_name?.trim().toLowerCase()] || row.owner_name;
+          if (!display || EXCLUDE.includes(display)) continue;
+          if (!raw[display]) raw[display] = [];
+          // Push individual deal days if available, else use avg as proxy
+          raw[display].push({ avg: row.avg, count: row.count, min: row.min, max: row.max });
+        }
+        // Combine entries per display name
+        const map = {};
+        for (const [display, rows] of Object.entries(raw)) {
+          const totalCount = rows.reduce((s, r) => s + r.count, 0);
+          const weightedAvg = rows.reduce((s, r) => s + r.avg * r.count, 0) / totalCount;
+          const minVal = Math.min(...rows.map(r => r.min));
+          const maxVal = Math.max(...rows.map(r => r.max));
+          map[display] = {
+            count: totalCount,
+            avg: Math.round(weightedAvg * 10) / 10,
+            min: Math.round(minVal * 10) / 10,
+            max: Math.round(maxVal * 10) / 10,
+          };
         }
         setStatsMap(map);
         setLoading(false);
@@ -96,32 +160,11 @@ export default function CasPredajaClient() {
   const theadStyle = dark ? { backgroundColor: "#3d0e2a" } : { backgroundColor: "#F7F6F4" };
   const btnBase = dark ? "text-gray-300 hover:opacity-80" : "bg-gray-100 text-gray-700 hover:bg-gray-200";
 
-  // Broker names for selected office
-  const brokerNames = office === "Všetky"
-    ? Object.keys(OFFICES).filter(o => o !== "Všetky").flatMap(getBrokerNames).filter((n, i, a) => a.indexOf(n) === i)
-    : getBrokerNames(office);
+  const brokers = getBrokers(office).filter(b => !EXCLUDE.includes(b.display));
 
-  const brokerList = brokerNames
-    .filter(n => !EXCLUDE.includes(n))
-    .map(name => {
-      const s = statsMap[name] || null;
-      return { name, count: s ? s.count : 0, avg: s ? s.avg : null, min: s ? s.min : null, max: s ? s.max : null };
-    })
-    .sort((a, b) => {
-      if (a.avg === null && b.avg === null) return 0;
-      if (a.avg === null) return 1;
-      if (b.avg === null) return -1;
-      return a.avg - b.avg;
-    });
-
-  // Office summary cards
-  const officeSummary = Object.keys(OFFICES).filter(o => o !== "Všetky").map(o => {
-    const names = getBrokerNames(o).filter(n => !EXCLUDE.includes(n));
-    const withData = names.filter(n => statsMap[n]);
-    if (withData.length === 0) return { name: o, avg: null, count: 0 };
-    const totalAvg = withData.reduce((a, n) => a + statsMap[n].avg, 0) / withData.length;
-    const totalCount = withData.reduce((a, n) => a + statsMap[n].count, 0);
-    return { name: o, avg: Math.round(totalAvg * 10) / 10, count: totalCount };
+  const brokerList = brokers.map(({ display }) => {
+    const s = statsMap[display] || null;
+    return { name: display, count: s ? s.count : 0, avg: s ? s.avg : null, min: s ? s.min : null, max: s ? s.max : null };
   }).sort((a, b) => {
     if (a.avg === null && b.avg === null) return 0;
     if (a.avg === null) return 1;
@@ -129,9 +172,24 @@ export default function CasPredajaClient() {
     return a.avg - b.avg;
   });
 
-  const withData = brokerNames.filter(n => !EXCLUDE.includes(n) && statsMap[n]);
-  const overallAvg = withData.length > 0
-    ? Math.round(withData.reduce((a, n) => a + statsMap[n].avg, 0) / withData.length * 10) / 10
+  const officeSummary = Object.keys(BROKER_GROUPS).map(o => {
+    const obrokers = BROKER_GROUPS[o].filter(b => !EXCLUDE.includes(b.display));
+    const withData = obrokers.filter(b => statsMap[b.display]);
+    if (withData.length === 0) return { name: o, avg: null, count: 0 };
+    const totalCount = withData.reduce((a, b) => a + statsMap[b.display].count, 0);
+    const weightedAvg = withData.reduce((a, b) => a + statsMap[b.display].avg * statsMap[b.display].count, 0) / totalCount;
+    return { name: o, avg: Math.round(weightedAvg * 10) / 10, count: totalCount };
+  }).sort((a, b) => {
+    if (a.avg === null && b.avg === null) return 0;
+    if (a.avg === null) return 1;
+    if (b.avg === null) return -1;
+    return a.avg - b.avg;
+  });
+
+  const withData = brokers.filter(b => statsMap[b.display]);
+  const totalCount = withData.reduce((a, b) => a + statsMap[b.display].count, 0);
+  const overallAvg = totalCount > 0
+    ? Math.round(withData.reduce((a, b) => a + statsMap[b.display].avg * statsMap[b.display].count, 0) / totalCount * 10) / 10
     : null;
   const overallSpeed = getSpeed(overallAvg);
 
@@ -160,11 +218,10 @@ export default function CasPredajaClient() {
 
         {!loading && !error && (
           <>
-            {/* Summary cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
               <div className={"rounded-xl p-4 " + cardCls} style={cardStyle}>
                 <p className={"text-sm " + (dark ? "text-gray-400" : "text-gray-500")}>Celkom maklérov</p>
-                <p className="text-2xl font-bold">{brokerNames.filter(n => !EXCLUDE.includes(n)).length}</p>
+                <p className="text-2xl font-bold">{brokers.length}</p>
               </div>
               <div className={"rounded-xl p-4 " + cardCls} style={cardStyle}>
                 <p className={"text-sm " + (dark ? "text-gray-400" : "text-gray-500")}>Priem. čas (dni)</p>
@@ -172,17 +229,16 @@ export default function CasPredajaClient() {
               </div>
               <div className={"rounded-xl p-4 " + cardCls} style={cardStyle}>
                 <p className={"text-sm " + (dark ? "text-gray-400" : "text-gray-500")}>Rýchlych (≤30d)</p>
-                <p className="text-2xl font-bold text-green-400">{withData.filter(n => statsMap[n].avg <= 30).length}</p>
+                <p className="text-2xl font-bold text-green-400">{withData.filter(b => statsMap[b.display].avg <= 30).length}</p>
               </div>
               <div className={"rounded-xl p-4 " + cardCls} style={cardStyle}>
                 <p className={"text-sm " + (dark ? "text-gray-400" : "text-gray-500")}>Pomalých (&gt;60d)</p>
-                <p className="text-2xl font-bold text-red-400">{withData.filter(n => statsMap[n].avg > 60).length}</p>
+                <p className="text-2xl font-bold text-red-400">{withData.filter(b => statsMap[b.display].avg > 60).length}</p>
               </div>
             </div>
 
-            {/* Office filter buttons */}
             <div className="flex flex-wrap gap-2 mb-4 md:mb-8">
-              {Object.keys(OFFICES).map(o => (
+              {["Všetky", ...Object.keys(BROKER_GROUPS)].map(o => (
                 <button key={o} onClick={() => setOffice(o)}
                   className={"px-4 py-2 rounded-full text-sm font-medium " + (office === o ? "text-white" : btnBase)}
                   style={office === o ? { backgroundColor: "#FF501C" } : {}}>
@@ -191,7 +247,6 @@ export default function CasPredajaClient() {
               ))}
             </div>
 
-            {/* Office summary cards */}
             {office === "Všetky" && (
               <div className="mb-8">
                 <h2 className="text-xl font-semibold mb-4">Prehľad kancelárií</h2>
@@ -214,7 +269,6 @@ export default function CasPredajaClient() {
               </div>
             )}
 
-            {/* Broker table */}
             <h2 className="text-xl font-semibold mb-4">
               {office === "Všetky" ? "Všetci makléri" : "Makléri – " + office}
             </h2>

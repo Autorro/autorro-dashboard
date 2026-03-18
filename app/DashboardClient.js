@@ -84,7 +84,7 @@ export default function DashboardClient({ deals }) {
         </div>
         <p className={"mb-6 " + (dark ? "text-gray-400" : "text-gray-500")}>Zdravie ponuky – Stage: Inzerované</p>
 
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
           <div className={"rounded-xl p-4 " + cardCls}>
             <p className={"text-sm " + (dark ? "text-gray-400" : "text-gray-500")}>Celkom dealov</p>
             <p className="text-2xl font-bold">{officeDeals.length}</p>
@@ -103,7 +103,7 @@ export default function DashboardClient({ deals }) {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 mb-8">
+        <div className="flex flex-wrap gap-2 mb-4 md:mb-8">
           {Object.keys(OFFICES).map(o => (
             <button key={o} onClick={() => setOffice(o)}
               className={"px-4 py-2 rounded-full text-sm font-medium " + (office === o ? "bg-blue-600 text-white" : btnBase)}>
@@ -115,7 +115,7 @@ export default function DashboardClient({ deals }) {
         {office === "Všetky" && (
           <div className="mb-8">
             <h2 className="text-xl font-semibold mb-4">Prehľad kancelárií</h2>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {officeSummary.map(o => {
                 const h = getHealth(o.pct);
                 return (
@@ -136,7 +136,7 @@ export default function DashboardClient({ deals }) {
         <h2 className="text-xl font-semibold mb-4">
           {office === "Všetky" ? "Všetci makléri" : "Makléri – " + office}
         </h2>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm min-w-[600px]">
           <thead className={theadCls}>
             <tr>
               <th className="p-3 text-left">#</th>
@@ -164,7 +164,7 @@ export default function DashboardClient({ deals }) {
               );
             })}
           </tbody>
-        </table>
+        </table></div>
       </div>
     </div>
   );

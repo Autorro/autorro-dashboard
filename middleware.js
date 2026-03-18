@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 
 export async function middleware(request) {
   const response = NextResponse.next()
+  
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -20,7 +21,12 @@ export async function middleware(request) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user && !request.nextUrl.pathname.startsWith('/login')) {
+  const isPublicPath = 
+    request.nextUrl.pathname.startsWith('/login') ||
+    request.nextUrl.pathname.startsWith('/forgot-password') ||
+    request.nextUrl.pathname.startsWith('/reset-password')
+
+  if (!user && !isPublicPath) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
@@ -28,5 +34,5 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api).*)'],
 }

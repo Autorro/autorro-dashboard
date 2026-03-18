@@ -39,6 +39,9 @@ export default function DashboardLayout({ children }) {
           <Link href="/pipeline" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors">
             <span>🚗</span> Pipeline
           </Link>
+          <Link href="/users" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors">
+            <span>👥</span> Používatelia
+          </Link>
         </nav>
         <LogoutButton />
       </aside>

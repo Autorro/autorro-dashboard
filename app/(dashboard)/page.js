@@ -1,4 +1,4 @@
-export const dynamic = "force-dynamic";
+export const revalidate = 600; // cache 10 minút
 import DashboardClient from "./DashboardClient";
 
 const INZEROVANE_STAGES = [13, 31, 34, 22];
@@ -6,13 +6,13 @@ const INZEROVANE_STAGES = [13, 31, 34, 22];
 async function getAllDeals() {
   const apiToken = process.env.PIPEDRIVE_API_TOKEN;
   let all = [];
-  
+
   for (const stageId of INZEROVANE_STAGES) {
     let start = 0;
     while (true) {
       const response = await fetch(
         "https://api.pipedrive.com/v1/deals?api_token=" + apiToken + "&limit=100&start=" + start + "&status=open&stage_id=" + stageId + "&fields=id,title,owner_id,stage_id,value,currency,status,880011fdbacbc3eee50103ec49001ac8abd56ae1",
-        { next: { revalidate: 300 } }
+        { next: { revalidate: 600 } }
       );
       const data = await response.json();
       all = all.concat(data.data || []);

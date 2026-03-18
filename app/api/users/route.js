@@ -13,9 +13,9 @@ export async function GET() {
 }
 
 export async function POST(request) {
-  const { email, password } = await request.json()
-  const { data, error } = await supabase.auth.admin.createUser({
-    email, password, email_confirm: true
+  const { email } = await request.json()
+  const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
+    redirectTo: 'https://autorro-dashboard.vercel.app/reset-password'
   })
   if (error) return Response.json({ error: error.message }, { status: 400 })
   return Response.json({ user: data.user })

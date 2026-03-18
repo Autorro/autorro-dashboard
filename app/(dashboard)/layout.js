@@ -43,6 +43,9 @@ export default function DashboardLayout({ children }) {
             <span>👥</span> Používatelia
           </Link>
         </nav>
+        <Link href="/zmena-hesla" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors">
+          <span>🔑</span> Zmena hesla
+        </Link>
         <LogoutButton />
       </aside>
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around z-50">

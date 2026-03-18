@@ -38,17 +38,11 @@ export default function DashboardClient() {
   const [office, setOffice] = useState("Všetky");
   const [dark, setDark] = useState(false);
 
-  const [conversion, setConversion] = useState(null);
-
   useEffect(() => {
     fetch("/api/zdravie-ponuky")
       .then(r => r.json())
       .then(data => { setDeals(data); setLoading(false); })
       .catch(() => setLoading(false));
-    fetch("/api/wasitlead-conversion")
-      .then(r => r.json())
-      .then(setConversion)
-      .catch(() => {});
   }, []);
 
   const bg = dark ? "text-white" : "text-gray-900";
@@ -160,87 +154,6 @@ export default function DashboardClient() {
               ))}
             </div>
           </div>
-
-          {/* Konverzia Lead → Inzerované */}
-          {conversion && (() => {
-            const officeNames = office === "Všetky" ? null : (OFFICES[office] || []);
-            const brokerRows = conversion.byBroker.filter(b =>
-              !officeNames || officeNames.some(n => n.trim().toLowerCase() === b.name.trim().toLowerCase())
-            );
-            const filtTotal = brokerRows.reduce((a, b) => a + b.total, 0);
-            const filtInz = brokerRows.reduce((a, b) => a + b.inzerovane, 0);
-            const filtPct = filtTotal > 0 ? Math.round((filtInz / filtTotal) * 100) : 0;
-            const filtWon = brokerRows.reduce((a, b) => a + b.won, 0);
-            const filtLost = brokerRows.reduce((a, b) => a + b.lost, 0);
-            const pctColor = filtPct >= 50 ? "text-green-400" : filtPct >= 30 ? "text-yellow-400" : "text-red-400";
-            const barColor = filtPct >= 50 ? "#22c55e" : filtPct >= 30 ? "#eab308" : "#ef4444";
-            return (
-              <div className={"rounded-xl p-4 mb-6 " + cardCls} style={cardStyle}>
-                <h2 className="font-semibold mb-3">Konverzia: Lead callcentra → Inzerované</h2>
-                {/* Summary */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                  <div>
-                    <p className={"text-xs mb-1 " + (dark ? "text-gray-400" : "text-gray-500")}>Leadov od CC</p>
-                    <p className="text-2xl font-bold">{filtTotal}</p>
-                  </div>
-                  <div>
-                    <p className={"text-xs mb-1 " + (dark ? "text-gray-400" : "text-gray-500")}>Dostalo sa do ponuky</p>
-                    <p className={"text-2xl font-bold " + pctColor}>{filtInz} <span className="text-base">({filtPct}%)</span></p>
-                  </div>
-                  <div>
-                    <p className={"text-xs mb-1 " + (dark ? "text-gray-400" : "text-gray-500")}>Predaných (won)</p>
-                    <p className="text-2xl font-bold text-green-400">{filtWon}</p>
-                  </div>
-                  <div>
-                    <p className={"text-xs mb-1 " + (dark ? "text-gray-400" : "text-gray-500")}>Stratených (lost)</p>
-                    <p className="text-2xl font-bold text-red-400">{filtLost}</p>
-                  </div>
-                </div>
-                <div className={"w-full rounded-full h-2 mb-4 " + (dark ? "bg-gray-700" : "bg-gray-200")}>
-                  <div className="h-2 rounded-full" style={{ width: filtPct + "%", backgroundColor: barColor }} />
-                </div>
-                {/* Per broker table */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm min-w-[500px]">
-                    <thead className={theadCls} style={theadStyle}>
-                      <tr>
-                        <th className="p-2 text-left">#</th>
-                        <th className="p-2 text-left">Maklér</th>
-                        <th className="p-2 text-left">Leadov</th>
-                        <th className="p-2 text-left">Do ponuky</th>
-                        <th className="p-2 text-left">Won</th>
-                        <th className="p-2 text-left">Lost</th>
-                        <th className="p-2 text-left">Úspešnosť</th>
-                        <th className="p-2 text-left w-32">Graf</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {brokerRows.map((b, i) => {
-                        const c = b.pct >= 50 ? "text-green-400" : b.pct >= 30 ? "text-yellow-400" : "text-red-400";
-                        const bc = b.pct >= 50 ? "#22c55e" : b.pct >= 30 ? "#eab308" : "#ef4444";
-                        return (
-                          <tr key={b.name} className={"border-t " + rowCls}>
-                            <td className="p-2 text-gray-500">{i + 1}</td>
-                            <td className="p-2 font-medium">{b.name}</td>
-                            <td className="p-2">{b.total}</td>
-                            <td className={"p-2 font-bold " + c}>{b.inzerovane}</td>
-                            <td className="p-2 text-green-400">{b.won}</td>
-                            <td className="p-2 text-red-400">{b.lost}</td>
-                            <td className={"p-2 font-bold " + c}>{b.pct}%</td>
-                            <td className="p-2">
-                              <div className={"w-full rounded-full h-2 " + (dark ? "bg-gray-700" : "bg-gray-200")}>
-                                <div className="h-2 rounded-full" style={{ width: b.pct + "%", backgroundColor: bc }} />
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            );
-          })()}
 
           <div className="flex flex-wrap gap-2 mb-4 md:mb-8">
             {Object.keys(OFFICES).map(o => (

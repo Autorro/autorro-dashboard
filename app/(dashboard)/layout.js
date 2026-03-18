@@ -45,6 +45,7 @@ export default function DashboardLayout({ children }) {
           <NavLink href="/" icon="🏥" label="Zdravie ponuky" />
           <NavLink href="/trend" icon="📈" label="Trend zdravia" />
           <NavLink href="/reakčný-čas" icon="⚡" label="Reakčný čas" />
+          <NavLink href="/cas-predaja" icon="🕐" label="Čas predaja" />
           <NavLink href="/aktivity" icon="📊" label="Aktivity" />
           <NavLink href="/pipeline" icon="🚗" label="Pipeline" />
           <NavLink href="/users" icon="👥" label="Používatelia" />

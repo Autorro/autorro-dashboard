@@ -15,103 +15,74 @@ const OFFICES = {
 };
 const EXCLUDE = ["Development","Tomáš Martiš","Miroslav Hrehor","Peter Hudec","Jaroslav Kováč"];
 
-/* ── Kariérne pozície (objem historicky = deal.value all-time) ── */
+/* ── Kariérne pozície ── */
 const TIERS = [
-  { id: "M1", label: "M1", min: 0,       max: 30_000,  color: "#6b7280", bg: "#f3f4f6", hotovostna: 40, uverova: 20 },
-  { id: "M2", label: "M2", min: 30_000,  max: 100_000, color: "#2563eb", bg: "#eff6ff", hotovostna: 45, uverova: 20 },
-  { id: "M3", label: "M3", min: 100_000, max: 200_000, color: "#16a34a", bg: "#f0fdf4", hotovostna: 50, uverova: 25 },
-  { id: "M4", label: "M4", min: 200_000, max: 400_000, color: "#d97706", bg: "#fffbeb", hotovostna: 60, uverova: 25 },
-  { id: "M5", label: "M5", min: 400_000, max: 800_000, color: "#ea580c", bg: "#fff7ed", hotovostna: 75, uverova: 25 },
-  { id: "M6", label: "M6", min: 800_000, max: Infinity, color: "#7c3aed", bg: "#f5f3ff", hotovostna: 90, uverova: 25 },
+  { id:"M1", min:0,       max:30_000,  color:"#6b7280", light:"#f3f4f6", hotovostna:40, uverova:20 },
+  { id:"M2", min:30_000,  max:100_000, color:"#2563eb", light:"#dbeafe", hotovostna:45, uverova:20 },
+  { id:"M3", min:100_000, max:200_000, color:"#16a34a", light:"#dcfce7", hotovostna:50, uverova:25 },
+  { id:"M4", min:200_000, max:400_000, color:"#d97706", light:"#fef3c7", hotovostna:60, uverova:25 },
+  { id:"M5", min:400_000, max:800_000, color:"#ea580c", light:"#ffedd5", hotovostna:75, uverova:25 },
+  { id:"M6", min:800_000, max:Infinity,color:"#7c3aed", light:"#ede9fe", hotovostna:90, uverova:25 },
 ];
 
-function getTier(allTimeTotal) {
-  return TIERS.findLast(t => allTimeTotal >= t.min) || TIERS[0];
+function getTier(v) { return TIERS.findLast(t => v >= t.min) || TIERS[0]; }
+function getTierProgress(v) {
+  const t = getTier(v);
+  if (t.max === Infinity) return { tier:t, pct:100, remaining:0, next:null };
+  return { tier:t, pct: Math.min(100,((v-t.min)/(t.max-t.min))*100), remaining:t.max-v, next:TIERS[TIERS.indexOf(t)+1]||null };
 }
 
-function getTierProgress(allTimeTotal) {
-  const tier = getTier(allTimeTotal);
-  if (tier.max === Infinity) return { tier, pct: 100, remaining: 0, next: null };
-  const pct       = Math.min(100, ((allTimeTotal - tier.min) / (tier.max - tier.min)) * 100);
-  const remaining = tier.max - allTimeTotal;
-  const next      = TIERS[TIERS.indexOf(tier) + 1] || null;
-  return { tier, pct, remaining, next };
+/* ── Initials avatar ── */
+function initials(name) {
+  const p = name.trim().split(/\s+/);
+  return p.length >= 2 ? p[0][0]+p[p.length-1][0] : name.slice(0,2);
+}
+function avatarColor(name) {
+  const colors = ["#FF501C","#2563eb","#16a34a","#d97706","#7c3aed","#db2777","#0891b2","#4f46e5"];
+  let h = 0; for (const c of name) h = (h*31+c.charCodeAt(0))%colors.length;
+  return colors[h];
 }
 
 /* ── Kurzy ── */
-const FX = { EUR: 1, CZK: 1 / 25.5 };
-function toEur(value, currency) {
-  return value * (FX[currency] ?? 1);
-}
+const FX = { EUR:1, CZK:1/25.5 };
+function toEur(v, cur) { return v*(FX[cur]??1); }
 
-/* ── Helpers ── */
-function norm(s) {
-  return (s || "").normalize("NFD").replace(/\p{Diacritic}/gu,"").trim().toLowerCase();
+function norm(s) { return (s||"").normalize("NFD").replace(/\p{Diacritic}/gu,"").trim().toLowerCase(); }
+function inOffice(name, list) { if(!list) return true; const n=norm(name); return list.some(a=>norm(a)===n); }
+
+function fmtEur(v, decimals=0) {
+  return new Intl.NumberFormat("sk-SK",{style:"currency",currency:"EUR",maximumFractionDigits:decimals}).format(v);
 }
-function inOffice(name, officeNames) {
-  if (!officeNames) return true;
-  const n = norm(name);
-  return officeNames.some(a => norm(a) === n);
-}
-function fmtMoney(v) {
-  return new Intl.NumberFormat("sk-SK", { style:"currency", currency:"EUR", maximumFractionDigits: 0 }).format(v);
-}
-function fmtOrig(v, currency) {
-  if (currency === "EUR") return null;
-  return new Intl.NumberFormat("sk-SK", { style:"currency", currency, maximumFractionDigits: 0 }).format(v);
+function fmtOrig(v, cur) {
+  if(cur==="EUR") return null;
+  return new Intl.NumberFormat("sk-SK",{style:"currency",currency:cur,maximumFractionDigits:0}).format(v);
 }
 function fmtDate(d) {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("sk-SK", { day:"2-digit", month:"2-digit", year:"numeric" });
+  if(!d) return "—";
+  return new Date(d).toLocaleDateString("sk-SK",{day:"2-digit",month:"2-digit",year:"numeric"});
 }
 
 /* ── Prednastavené obdobia ── */
 function getRange(period) {
-  const now = new Date(), y = now.getFullYear(), m = now.getMonth();
-  switch (period) {
-    case "Tento mesiac":        return { from: new Date(y, m, 1),   to: new Date(y, m+1, 0) };
-    case "Minulý mesiac":       return { from: new Date(y, m-1, 1), to: new Date(y, m, 0)   };
-    case "Posledné 3 mesiace":  return { from: new Date(y, m-2, 1), to: new Date(y, m+1, 0) };
-    case "Tento rok":           return { from: new Date(y, 0, 1),   to: new Date(y, 11, 31) };
-    default:                    return null;
+  const now=new Date(), y=now.getFullYear(), m=now.getMonth();
+  switch(period){
+    case "Tento mesiac":       return {from:new Date(y,m,1),   to:new Date(y,m+1,0)};
+    case "Minulý mesiac":      return {from:new Date(y,m-1,1), to:new Date(y,m,0)};
+    case "Posledné 3 mesiace": return {from:new Date(y,m-2,1), to:new Date(y,m+1,0)};
+    case "Tento rok":          return {from:new Date(y,0,1),   to:new Date(y,11,31)};
+    default:                   return null;
   }
+}
+function thisMonthRange() {
+  const now=new Date(), y=now.getFullYear(), m=now.getMonth();
+  return {from:new Date(y,m,1), to:new Date(y,m+1,0)};
 }
 
 const PERIODS = ["Tento mesiac","Minulý mesiac","Posledné 3 mesiace","Tento rok","Vlastné"];
 const MEDALS  = ["🥇","🥈","🥉"];
 const ACCENT  = "#FF501C";
-const cardCls = "bg-white shadow-sm rounded-xl";
 
-/* ── Tier badge komponent ── */
-function TierBadge({ tier, size = "md" }) {
-  const cls = size === "sm"
-    ? "text-xs px-1.5 py-0.5 rounded font-bold"
-    : "text-xs px-2 py-1 rounded-md font-extrabold tracking-wide";
-  return (
-    <span className={cls} style={{ backgroundColor: tier.bg, color: tier.color, border: `1.5px solid ${tier.color}` }}>
-      {tier.label}
-    </span>
-  );
-}
-
-/* ── Tier progress bar ── */
-function TierProgressBar({ allTimeTotal }) {
-  const { tier, pct, remaining, next } = getTierProgress(allTimeTotal);
-  return (
-    <div className="mt-1">
-      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden w-full max-w-xs">
-        <div className="h-full rounded-full transition-all" style={{ width: pct + "%", backgroundColor: tier.color }} />
-      </div>
-      {next && (
-        <p className="text-xs mt-0.5" style={{ color: tier.color }}>
-          do {next.label}: {fmtMoney(remaining)}
-        </p>
-      )}
-    </div>
-  );
-}
-
-/* ── Hlavný komponent ── */
+/* ══════════════════════════════════════════════════════ */
 export default function SalesLeaderboardClient() {
   const [allDeals, setAllDeals] = useState([]);
   const [loading,  setLoading]  = useState(true);
@@ -121,292 +92,335 @@ export default function SalesLeaderboardClient() {
   const [to,       setTo]       = useState("");
   const [expanded, setExpanded] = useState(null);
 
-  useEffect(() => {
+  useEffect(()=>{
     setLoading(true);
     fetch("/api/leaderboard")
-      .then(r => r.json())
-      .then(d => setAllDeals(Array.isArray(d) ? d : []))
-      .finally(() => setLoading(false));
-  }, []);
+      .then(r=>r.json())
+      .then(d=>setAllDeals(Array.isArray(d)?d:[]))
+      .finally(()=>setLoading(false));
+  },[]);
 
-  /* ── All-time historický objem podľa makléra (bez filtra dátumu/kancelárie) ── */
+  /* ── Kariérne all-time totaly (bez filtra) ── */
   const allTimeByBroker = {};
-  for (const d of allDeals) {
-    if (EXCLUDE.some(e => norm(e) === norm(d.owner))) continue;
-    if (!allTimeByBroker[d.owner]) allTimeByBroker[d.owner] = 0;
-    allTimeByBroker[d.owner] += toEur(d.cenaVozidla, d.currency);
+  for(const d of allDeals){
+    if(EXCLUDE.some(e=>norm(e)===norm(d.owner))) continue;
+    allTimeByBroker[d.owner]=(allTimeByBroker[d.owner]||0)+toEur(d.cenaVozidla,d.currency);
   }
 
-  /* ── Filter podľa dátumu + kancelárie ── */
-  const range = period === "Vlastné"
-    ? (from && to ? { from: new Date(from), to: new Date(to + "T23:59:59") } : null)
+  /* ── Sumy pre tento mesiac (vždy, bez ohľadu na filter) ── */
+  const tmr = thisMonthRange();
+  const thisMonthByBroker = {};
+  for(const d of allDeals){
+    if(EXCLUDE.some(e=>norm(e)===norm(d.owner))) continue;
+    if(!d.wonTime) continue;
+    const t=new Date(d.wonTime);
+    if(t<tmr.from||t>tmr.to) continue;
+    thisMonthByBroker[d.owner]=(thisMonthByBroker[d.owner]||0)+toEur(d.cenaVozidla,d.currency);
+  }
+
+  /* ── Filter ── */
+  const range = period==="Vlastné"
+    ? (from&&to?{from:new Date(from),to:new Date(to+"T23:59:59")}:null)
     : getRange(period);
 
-  const filtered = allDeals.filter(d => {
-    if (EXCLUDE.some(e => norm(e) === norm(d.owner))) return false;
-    if (!inOffice(d.owner, OFFICES[office])) return false;
-    if (!d.wonTime) return false;
-    if (range) {
-      const t = new Date(d.wonTime);
-      if (t < range.from || t > range.to) return false;
-    }
+  const filtered = allDeals.filter(d=>{
+    if(EXCLUDE.some(e=>norm(e)===norm(d.owner))) return false;
+    if(!inOffice(d.owner,OFFICES[office])) return false;
+    if(!d.wonTime) return false;
+    if(range){const t=new Date(d.wonTime);if(t<range.from||t>range.to) return false;}
     return true;
   });
 
-  /* ── Agregácia podľa makléra ── */
-  const brokerMap = {};
-  for (const d of filtered) {
-    if (!brokerMap[d.owner]) brokerMap[d.owner] = { count: 0, total: 0, deals: [] };
-    brokerMap[d.owner].count += 1;
-    brokerMap[d.owner].total += toEur(d.cenaVozidla, d.currency);
-    brokerMap[d.owner].deals.push(d);
+  /* ── Agregácia ── */
+  const bMap={};
+  for(const d of filtered){
+    if(!bMap[d.owner]) bMap[d.owner]={count:0,total:0,deals:[]};
+    bMap[d.owner].count++;
+    bMap[d.owner].total+=toEur(d.cenaVozidla,d.currency);
+    bMap[d.owner].deals.push(d);
   }
-  const brokers = Object.entries(brokerMap)
-    .map(([name, s]) => ({
+  const brokers = Object.entries(bMap)
+    .map(([name,s])=>({
       name, ...s,
-      avg:         s.total / s.count,
-      allTimeTotal: allTimeByBroker[name] || 0,
+      avg:s.total/s.count,
+      allTimeTotal: allTimeByBroker[name]||0,
+      thisMonth:    thisMonthByBroker[name]||0,
     }))
-    .sort((a, b) => b.total - a.total || b.count - a.count);
+    .sort((a,b)=>b.total-a.total||b.count-a.count);
 
-  const totalDeals   = brokers.reduce((s, b) => s + b.count, 0);
-  const totalRevenue = brokers.reduce((s, b) => s + b.total, 0);
-  const avgPerDeal   = totalDeals ? totalRevenue / totalDeals : 0;
+  const totalDeals   = brokers.reduce((s,b)=>s+b.count,0);
+  const totalRevenue = brokers.reduce((s,b)=>s+b.total,0);
+  const avgPerDeal   = totalDeals?totalRevenue/totalDeals:0;
+  const totalThisMonth = Object.values(thisMonthByBroker)
+    .filter((_,i)=>!EXCLUDE.some(e=>norm(e)===norm(Object.keys(thisMonthByBroker)[i])))
+    .reduce((s,v)=>s+v,0);
 
   /* ── Skeleton ── */
-  if (loading) return (
+  if(loading) return(
     <div className="space-y-4 animate-pulse">
-      <div className="h-10 bg-gray-200 rounded-xl w-1/2" />
-      <div className="h-28 bg-gray-200 rounded-xl" />
-      {[...Array(6)].map((_,i) => <div key={i} className="h-16 bg-gray-200 rounded-xl" />)}
+      <div className="h-10 bg-gray-200 rounded-2xl w-1/2"/>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[...Array(4)].map((_,i)=><div key={i} className="h-24 bg-gray-200 rounded-2xl"/>)}
+      </div>
+      {[...Array(6)].map((_,i)=><div key={i} className="h-20 bg-gray-200 rounded-2xl"/>)}
     </div>
   );
 
-  return (
+  return(
     <div className="space-y-5">
 
       {/* ── Nadpis ── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">🏆 Leaderboard predaja</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Predané vozidlá a obrat podľa makléra · pozícia = kariérny objem</p>
+          <h1 className="text-2xl font-extrabold text-gray-900">🏆 Leaderboard predaja</h1>
+          <p className="text-sm text-gray-400 mt-0.5">Obrat a zárobky podľa makléra · pozícia = kariérny objem</p>
         </div>
         <button
-          onClick={() => { setLoading(true); fetch("/api/leaderboard?force=1").then(r=>r.json()).then(d=>setAllDeals(Array.isArray(d)?d:[])).finally(()=>setLoading(false)); }}
-          className="text-xs px-3 py-1.5 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center gap-1"
+          onClick={()=>{setLoading(true);fetch("/api/leaderboard?force=1").then(r=>r.json()).then(d=>setAllDeals(Array.isArray(d)?d:[])).finally(()=>setLoading(false));}}
+          className="text-xs px-4 py-2 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-1.5 font-medium"
         >🔄 Obnoviť</button>
       </div>
 
+      {/* ── Súhrnné karty ── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          {label:"Predané (obdobie)", value:totalDeals,     fmt:v=>v+" ks",  icon:"🚗", grad:"from-blue-600 to-blue-700"},
+          {label:"Obrat (obdobie)",   value:totalRevenue,   fmt:fmtEur,       icon:"💰", grad:"from-green-600 to-green-700"},
+          {label:"Priemerný deal",    value:avgPerDeal,     fmt:fmtEur,       icon:"📊", grad:"from-purple-600 to-purple-700"},
+          {label:"Obrat tento mesiac",value:totalThisMonth, fmt:fmtEur,       icon:"📅", grad:"from-orange-500 to-red-500"},
+        ].map(s=>(
+          <div key={s.label} className={`rounded-2xl p-4 text-white bg-gradient-to-br ${s.grad} shadow-sm`}>
+            <p className="text-xs font-semibold text-white/70 uppercase tracking-wider mb-1">{s.icon} {s.label}</p>
+            <p className="text-xl font-extrabold leading-tight">{s.fmt(s.value)}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Filtre ── */}
+      <div className="bg-white rounded-2xl shadow-sm p-4 flex flex-wrap gap-4 items-end">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Kancelária</label>
+          <div className="flex flex-wrap gap-1.5">
+            {Object.keys(OFFICES).map(o=>(
+              <button key={o} onClick={()=>setOffice(o)}
+                className="px-3 py-1 rounded-full text-sm font-semibold transition-all"
+                style={office===o?{backgroundColor:ACCENT,color:"white",boxShadow:"0 2px 8px #FF501C55"}:{backgroundColor:"#f3f4f6",color:"#6b7280"}}
+              >{o}</button>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Obdobie</label>
+          <div className="flex flex-wrap gap-1.5">
+            {PERIODS.map(p=>(
+              <button key={p} onClick={()=>setPeriod(p)}
+                className="px-3 py-1 rounded-full text-sm font-semibold transition-all"
+                style={period===p?{backgroundColor:"#1e3a5f",color:"white",boxShadow:"0 2px 8px #1e3a5f55"}:{backgroundColor:"#f3f4f6",color:"#6b7280"}}
+              >{p}</button>
+            ))}
+          </div>
+        </div>
+        {period==="Vlastné"&&(
+          <div className="flex items-center gap-2 flex-wrap">
+            {[{label:"Od",val:from,set:setFrom},{label:"Do",val:to,set:setTo}].map(f=>(
+              <div key={f.label} className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-gray-400">{f.label}</label>
+                <input type="date" value={f.val} onChange={e=>f.set(e.target.value)}
+                  className="border border-gray-200 rounded-xl px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200"/>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* ── Legenda pozícií ── */}
-      <div className={cardCls + " p-4"}>
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Kariérne pozície — kumulatívny objem dealov</p>
+      <div className="bg-white rounded-2xl shadow-sm p-4">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Kariérne pozície (kumulatívny objem dealov)</p>
         <div className="flex flex-wrap gap-2">
-          {TIERS.map(t => (
-            <div key={t.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ backgroundColor: t.bg, border: `1px solid ${t.color}20` }}>
-              <span className="text-xs font-extrabold" style={{ color: t.color }}>{t.label}</span>
-              <span className="text-xs text-gray-500">
-                {t.max === Infinity ? `${fmtMoney(t.min)}+` : `${fmtMoney(t.min)} – ${fmtMoney(t.max)}`}
+          {TIERS.map(t=>(
+            <div key={t.id} className="flex items-center gap-2 px-3 py-2 rounded-xl"
+              style={{backgroundColor:t.light,border:`1.5px solid ${t.color}30`}}>
+              <span className="text-xs font-extrabold px-1.5 py-0.5 rounded" style={{color:t.color,backgroundColor:t.color+"18"}}>{t.id}</span>
+              <span className="text-xs text-gray-500 font-medium">
+                {t.max===Infinity?`${fmtEur(t.min)}+`:`${fmtEur(t.min)}–${fmtEur(t.max)}`}
               </span>
-              <span className="text-xs text-gray-400">·</span>
-              <span className="text-xs font-medium" style={{ color: t.color }}>{t.hotovostna}% hot.</span>
+              <span className="text-xs font-bold" style={{color:t.color}}>{t.hotovostna}%</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* ── Filtre ── */}
-      <div className={cardCls + " p-4 flex flex-wrap gap-3 items-end"}>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Kancelária</label>
-          <div className="flex flex-wrap gap-1.5">
-            {Object.keys(OFFICES).map(o => (
-              <button key={o} onClick={() => setOffice(o)}
-                className="px-3 py-1 rounded-full text-sm font-medium transition-colors"
-                style={office === o ? { backgroundColor: ACCENT, color:"white" } : { backgroundColor:"#f3f4f6", color:"#374151" }}
-              >{o}</button>
-            ))}
-          </div>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Obdobie</label>
-          <div className="flex flex-wrap gap-1.5">
-            {PERIODS.map(p => (
-              <button key={p} onClick={() => setPeriod(p)}
-                className="px-3 py-1 rounded-full text-sm font-medium transition-colors"
-                style={period === p ? { backgroundColor:"#1e3a5f", color:"white" } : { backgroundColor:"#f3f4f6", color:"#374151" }}
-              >{p}</button>
-            ))}
-          </div>
-        </div>
-        {period === "Vlastné" && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-gray-500">Od</label>
-              <input type="date" value={from} onChange={e=>setFrom(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2" />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-gray-500">Do</label>
-              <input type="date" value={to} onChange={e=>setTo(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2" />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ── Súhrnné karty ── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        {[
-          { label:"Predané vozidlá",   value: totalDeals,    fmt: v=>v,        suffix:" ks", color:"#1e3a5f" },
-          { label:"Celkový obrat",     value: totalRevenue,  fmt: fmtMoney,    suffix:"",   color:"#15803d" },
-          { label:"Priemerná hodnota", value: avgPerDeal,    fmt: fmtMoney,    suffix:"",   color:"#9333ea" },
-        ].map(s => (
-          <div key={s.label} className={cardCls + " p-4"}>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{s.label}</p>
-            <p className="text-2xl font-extrabold" style={{ color: s.color }}>{s.fmt(s.value)}{s.suffix}</p>
-          </div>
-        ))}
-      </div>
-
       {/* ── Leaderboard ── */}
-      {brokers.length === 0 ? (
-        <div className={cardCls + " p-8 text-center text-gray-500"}>Žiadne predaje v zvolenom období.</div>
-      ) : (
+      {brokers.length===0?(
+        <div className="bg-white rounded-2xl shadow-sm p-10 text-center text-gray-400">
+          <p className="text-4xl mb-3">📭</p>
+          <p className="font-semibold text-gray-600">Žiadne predaje v zvolenom období.</p>
+        </div>
+      ):(
         <div className="space-y-2">
-          {brokers.map((b, i) => {
-            const isExpanded              = expanded === b.name;
-            const sharePct                = totalRevenue ? (b.total / totalRevenue * 100) : 0;
-            const { tier, pct: tierPct, remaining, next } = getTierProgress(b.allTimeTotal);
+          {brokers.map((b,i)=>{
+            const isExpanded=expanded===b.name;
+            const sharePct=totalRevenue?(b.total/totalRevenue*100):0;
+            const {tier,pct:tierPct,remaining,next}=getTierProgress(b.allTimeTotal);
+            const earned=b.total*(tier.hotovostna/100);
+            const earnedMonth=b.thisMonth*(tier.hotovostna/100);
+            const ac=avatarColor(b.name);
+            const isTop3=i<3;
 
-            return (
-              <div key={b.name} className={cardCls + " overflow-hidden"}>
-                {/* ── Riadok makléra ── */}
-                <button
-                  onClick={() => setExpanded(isExpanded ? null : b.name)}
-                  className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors"
-                >
-                  {/* Rank */}
-                  <span className="text-xl w-8 text-center flex-shrink-0">
-                    {i < 3 ? MEDALS[i] : <span className="text-gray-400 font-bold text-base">#{i+1}</span>}
-                  </span>
+            return(
+              <div key={b.name} className="bg-white rounded-2xl shadow-sm overflow-hidden transition-shadow hover:shadow-md"
+                style={isTop3?{borderLeft:`4px solid ${["#f59e0b","#9ca3af","#b45309"][i]}`}:{borderLeft:"4px solid transparent"}}>
 
-                  {/* Meno + tier progress */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-gray-900 truncate">{b.name}</p>
-                      <TierBadge tier={tier} />
+                {/* ── Hlavný riadok ── */}
+                <button onClick={()=>setExpanded(isExpanded?null:b.name)}
+                  className="w-full text-left px-4 py-3.5 flex items-center gap-3 hover:bg-gray-50/70 transition-colors">
+
+                  {/* Rank + avatar */}
+                  <div className="flex-shrink-0 relative">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-extrabold"
+                      style={{backgroundColor:ac}}>
+                      {initials(b.name)}
                     </div>
-                    {/* Progress k ďalšej pozícii */}
-                    <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden w-full max-w-xs">
-                      <div className="h-full rounded-full transition-all" style={{ width: tierPct + "%", backgroundColor: tier.color }} />
-                    </div>
-                    {next ? (
-                      <p className="text-xs mt-0.5" style={{ color: tier.color }}>
-                        do {next.label}: chýba {fmtMoney(remaining)} · kariéra: {fmtMoney(b.allTimeTotal)}
-                      </p>
-                    ) : (
-                      <p className="text-xs mt-0.5 font-semibold" style={{ color: tier.color }}>
-                        ✦ Maximálna pozícia · kariéra: {fmtMoney(b.allTimeTotal)}
-                      </p>
+                    {isTop3&&(
+                      <span className="absolute -top-1.5 -right-1.5 text-base leading-none">
+                        {MEDALS[i]}
+                      </span>
+                    )}
+                    {!isTop3&&(
+                      <span className="absolute -top-1.5 -right-1.5 text-xs font-bold text-gray-400 bg-white rounded-full px-0.5">
+                        #{i+1}
+                      </span>
                     )}
                   </div>
 
+                  {/* Meno + tier + progress ── */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                      <p className="font-bold text-gray-900 text-sm truncate">{b.name}</p>
+                      {/* Tier badge */}
+                      <span className="text-xs font-extrabold px-2 py-0.5 rounded-md"
+                        style={{backgroundColor:tier.light,color:tier.color,border:`1.5px solid ${tier.color}40`}}>
+                        {tier.id}
+                      </span>
+                      {/* Tento mesiac badge */}
+                      {b.thisMonth>0&&(
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                          📅 {fmtEur(earnedMonth)} tento mes.
+                        </span>
+                      )}
+                    </div>
+                    {/* Tier progress bar */}
+                    <div className="flex items-center gap-2">
+                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden flex-1 max-w-[160px]">
+                        <div className="h-full rounded-full transition-all"
+                          style={{width:tierPct+"%",backgroundColor:tier.color}}/>
+                      </div>
+                      {next?(
+                        <span className="text-xs text-gray-400 whitespace-nowrap">do {next.id}: {fmtEur(remaining)}</span>
+                      ):(
+                        <span className="text-xs font-semibold" style={{color:tier.color}}>✦ Top pozícia</span>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Počet */}
-                  <div className="text-center hidden sm:block flex-shrink-0 w-16">
-                    <p className="text-xl font-extrabold text-gray-900">{b.count}</p>
-                    <p className="text-xs text-gray-400">vozidiel</p>
+                  <div className="hidden sm:flex flex-col items-center flex-shrink-0 w-14">
+                    <p className="text-xl font-extrabold text-gray-900 leading-none">{b.count}</p>
+                    <p className="text-xs text-gray-400">aut</p>
                   </div>
 
-                  {/* Obrat v období */}
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-base font-extrabold" style={{ color:"#15803d" }}>{fmtMoney(b.total)}</p>
-                    <p className="text-xs text-gray-400">ø {fmtMoney(b.avg)}/deal</p>
+                  {/* Obrat + zarobené */}
+                  <div className="flex-shrink-0 text-right">
+                    <p className="text-base font-extrabold text-gray-900">{fmtEur(b.total)}</p>
+                    <p className="text-xs font-bold text-emerald-600">zarobil: {fmtEur(earned)}</p>
                   </div>
 
-                  <span className="text-gray-400 flex-shrink-0 ml-1">{isExpanded ? "▲" : "▼"}</span>
+                  <span className="text-gray-300 flex-shrink-0 ml-1 text-sm">{isExpanded?"▲":"▼"}</span>
                 </button>
 
-                {/* ── Detail ── */}
-                {isExpanded && (
+                {/* ── Rozbalený detail ── */}
+                {isExpanded&&(
                   <div className="border-t border-gray-100">
 
-                    {/* Tier karta v detaile */}
-                    <div className="px-5 py-3 flex flex-wrap items-center gap-4"
-                      style={{ backgroundColor: tier.bg, borderBottom: `1px solid ${tier.color}20` }}>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-0.5">Kariérna pozícia</p>
-                        <div className="flex items-center gap-2">
-                          <TierBadge tier={tier} size="lg" />
-                          <span className="text-sm font-semibold" style={{ color: tier.color }}>
-                            {tier.hotovostna}% hotovostná / {tier.uverova}% úverová
-                          </span>
+                    {/* Info karta */}
+                    <div className="px-5 py-4 grid grid-cols-2 sm:grid-cols-4 gap-4"
+                      style={{backgroundColor:tier.light}}>
+                      {[
+                        {label:"Kariérna pozícia",   val:<span className="font-extrabold text-lg" style={{color:tier.color}}>{tier.id}</span>},
+                        {label:"Kariérny objem",     val:<span className="font-extrabold text-base text-gray-900">{fmtEur(b.allTimeTotal)}</span>},
+                        {label:"Zarobené (obdobie)", val:<span className="font-extrabold text-base text-emerald-700">{fmtEur(earned)}</span>},
+                        {label:"Zarobené (mes.)",    val:<span className="font-extrabold text-base text-emerald-700">{fmtEur(earnedMonth)}</span>},
+                      ].map(s=>(
+                        <div key={s.label}>
+                          <p className="text-xs text-gray-500 mb-0.5">{s.label}</p>
+                          {s.val}
                         </div>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-0.5">Kariérny objem (all-time)</p>
-                        <p className="text-lg font-extrabold text-gray-900">{fmtMoney(b.allTimeTotal)}</p>
-                      </div>
-                      {next && (
-                        <div>
-                          <p className="text-xs text-gray-500 mb-0.5">Do pozície {next.label}</p>
-                          <p className="text-sm font-bold text-gray-700">{fmtMoney(remaining)}</p>
-                          <div className="mt-1 h-2 bg-white rounded-full overflow-hidden w-32">
-                            <div className="h-full rounded-full" style={{ width: tierPct+"%", backgroundColor: tier.color }} />
+                      ))}
+                      {next&&(
+                        <div className="col-span-2 sm:col-span-4">
+                          <p className="text-xs text-gray-500 mb-1">Postup na {next.id} — chýba {fmtEur(remaining)}</p>
+                          <div className="h-2 bg-white rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all"
+                              style={{width:tierPct+"%",backgroundColor:tier.color}}/>
                           </div>
+                          <p className="text-xs text-gray-400 mt-0.5">{tierPct.toFixed(0)}% splnené</p>
                         </div>
                       )}
                     </div>
 
-                    {/* Mobile: karty dealov */}
+                    {/* Mobile karty dealov */}
                     <div className="md:hidden divide-y divide-gray-100">
-                      {b.deals.sort((a,z) => new Date(z.wonTime) - new Date(a.wonTime)).map(d => {
-                        const orig = fmtOrig(d.cenaVozidla, d.currency);
-                        const eur  = fmtMoney(toEur(d.cenaVozidla, d.currency));
-                        return (
+                      {b.deals.sort((a,z)=>new Date(z.wonTime)-new Date(a.wonTime)).map(d=>{
+                        const orig=fmtOrig(d.cenaVozidla,d.currency);
+                        const eur=fmtEur(toEur(d.cenaVozidla,d.currency));
+                        return(
                           <div key={d.id} className="px-4 py-3 flex justify-between items-start">
                             <div>
                               <p className="font-medium text-gray-800 text-sm">{d.title}</p>
                               <p className="text-xs text-gray-400">{fmtDate(d.wonTime)}</p>
                             </div>
                             <div className="text-right ml-2">
-                              <p className="font-bold text-green-700 text-sm whitespace-nowrap">{orig ?? eur}</p>
-                              {orig && <p className="text-xs text-gray-400 whitespace-nowrap">≈ {eur}</p>}
+                              <p className="font-bold text-green-700 text-sm whitespace-nowrap">{orig??eur}</p>
+                              {orig&&<p className="text-xs text-gray-400">≈ {eur}</p>}
                             </div>
                           </div>
                         );
                       })}
                     </div>
 
-                    {/* Desktop: tabuľka dealov */}
+                    {/* Desktop tabuľka dealov */}
                     <table className="hidden md:table w-full text-sm">
                       <thead>
                         <tr className="bg-gray-50 text-xs uppercase text-gray-400">
                           <th className="px-5 py-2 text-left font-semibold">Vozidlo</th>
-                          <th className="px-5 py-2 text-left font-semibold">Predané dňa</th>
-                          <th className="px-5 py-2 text-right font-semibold">Pôvodná hodnota</th>
+                          <th className="px-5 py-2 text-left font-semibold">Predané</th>
+                          <th className="px-5 py-2 text-right font-semibold">Pôv. hodnota</th>
                           <th className="px-5 py-2 text-right font-semibold">EUR</th>
+                          <th className="px-5 py-2 text-right font-semibold">Zárobek</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {b.deals.sort((a,z) => new Date(z.wonTime) - new Date(a.wonTime)).map(d => {
-                          const orig = fmtOrig(d.cenaVozidla, d.currency);
-                          const eur  = fmtMoney(toEur(d.cenaVozidla, d.currency));
-                          return (
+                        {b.deals.sort((a,z)=>new Date(z.wonTime)-new Date(a.wonTime)).map(d=>{
+                          const orig=fmtOrig(d.cenaVozidla,d.currency);
+                          const eur=toEur(d.cenaVozidla,d.currency);
+                          return(
                             <tr key={d.id} className="hover:bg-gray-50">
                               <td className="px-5 py-2.5 font-medium text-gray-800">{d.title}</td>
                               <td className="px-5 py-2.5 text-gray-500">{fmtDate(d.wonTime)}</td>
                               <td className="px-5 py-2.5 text-right">
-                                {orig ? <span className="font-semibold text-blue-700">{orig}</span> : <span className="text-gray-300">—</span>}
+                                {orig?<span className="font-semibold text-blue-700">{orig}</span>:<span className="text-gray-300">—</span>}
                               </td>
-                              <td className="px-5 py-2.5 text-right font-bold text-green-700">{eur}</td>
+                              <td className="px-5 py-2.5 text-right font-bold text-gray-800">{fmtEur(eur)}</td>
+                              <td className="px-5 py-2.5 text-right font-bold text-emerald-700">{fmtEur(eur*(tier.hotovostna/100))}</td>
                             </tr>
                           );
                         })}
                       </tbody>
                       <tfoot>
-                        <tr className="bg-green-50">
-                          <td colSpan={3} className="px-5 py-2 text-sm font-semibold text-green-800">Spolu v období (EUR)</td>
-                          <td className="px-5 py-2 text-right font-extrabold text-green-800">{fmtMoney(b.total)}</td>
+                        <tr className="bg-emerald-50">
+                          <td colSpan={3} className="px-5 py-2.5 text-sm font-semibold text-emerald-800">Spolu (EUR)</td>
+                          <td className="px-5 py-2.5 text-right font-extrabold text-gray-900">{fmtEur(b.total)}</td>
+                          <td className="px-5 py-2.5 text-right font-extrabold text-emerald-800">{fmtEur(earned)}</td>
                         </tr>
                       </tfoot>
                     </table>
@@ -418,9 +432,9 @@ export default function SalesLeaderboardClient() {
         </div>
       )}
 
-      {range && (
+      {range&&(
         <p className="text-xs text-gray-400 text-center">
-          Obdobie: {fmtDate(range.from.toISOString())} – {fmtDate(range.to.toISOString())} · {filtered.length} dealov · cache 5 min
+          {fmtDate(range.from.toISOString())} – {fmtDate(range.to.toISOString())} · {filtered.length} dealov · cache 5 min
         </p>
       )}
     </div>

@@ -60,7 +60,7 @@ function PriceDiffBadge({ diff }) {
   return <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">{diff}% ↓</span>;
 }
 
-const REFRESH_SEC = 30;
+const REFRESH_SEC = 180; // 3 minúty
 
 function computeBrokerHealth(deals) {
   const map = {};
@@ -183,7 +183,17 @@ export default function DashboardClient() {
           <h1 className="text-3xl font-bold">Autorro Dashboard</h1>
           <div className="flex gap-2">
             <button
-              onClick={() => { setPartyMode(p => !p); if (!partyMode) { baselineRef.current = null; setHistory([]); } }}
+              onClick={() => {
+                if (!partyMode) {
+                  baselineRef.current = null;
+                  setHistory([]);
+                  setPartyMode(true);
+                  // Ihneď načítaj čerstvé dáta — leaderboard sa zobrazí okamžite
+                  setTimeout(() => loadDeals(true), 50);
+                } else {
+                  setPartyMode(false);
+                }
+              }}
               className={"px-4 py-2 rounded-full text-sm font-bold transition-all " + (partyMode ? "text-white animate-pulse" : btnBase)}
               style={partyMode ? { backgroundColor: "#FF501C" } : {}}>
               {partyMode ? "🎉 LIVE" : "🎉 Party Mode"}

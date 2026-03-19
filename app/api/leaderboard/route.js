@@ -1,5 +1,4 @@
-const CENA_VOZIDLA = "7bc01b48cc10642c58f19ce14bb33fe8abb7bb97";
-const CACHE_TTL    = 5 * 60 * 1000; // 5 minút
+const CACHE_TTL = 5 * 60 * 1000; // 5 minút
 
 let cache = { data: null, timestamp: 0 };
 
@@ -41,7 +40,7 @@ export async function GET(request) {
     title:       d.title || "",
     owner:       d.owner_id?.name || d.owner_name || "",
     wonTime:     d.won_time || d.close_time || null,
-    cenaVozidla: Number(d[CENA_VOZIDLA]) || Number(d.value) || 0,
+    cenaVozidla: Number(d.value) || 0,
     currency:    d.currency || "EUR",
   }));
 

@@ -143,9 +143,19 @@ export default function DashboardClient() {
         </p>
 
         {loading && (
-          <div className="flex items-center gap-3 text-gray-400 py-12">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-400 border-t-orange-500" />
-            Načítavam dáta...
+          <div className="animate-pulse">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className={"rounded-xl p-4 h-20 " + (dark ? "bg-[#5c1a42]" : "bg-gray-100")} />
+              ))}
+            </div>
+            <div className={"rounded-xl p-4 mb-6 h-32 " + (dark ? "bg-[#5c1a42]" : "bg-gray-100")} />
+            <div className="flex gap-2 mb-6">
+              {[...Array(9)].map((_, i) => (
+                <div key={i} className={"rounded-full h-9 w-16 " + (dark ? "bg-[#5c1a42]" : "bg-gray-100")} />
+              ))}
+            </div>
+            <div className={"rounded-xl h-64 " + (dark ? "bg-[#5c1a42]" : "bg-gray-100")} />
           </div>
         )}
 

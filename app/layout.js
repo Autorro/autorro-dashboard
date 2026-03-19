@@ -1,7 +1,13 @@
 import "./globals.css";
-import Link from "next/link";
 
 export const metadata = { title: "Autorro Dashboard" };
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
 
 export default function RootLayout({ children }) {
   return (

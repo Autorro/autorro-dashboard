@@ -47,8 +47,6 @@ export default function DashboardLayout({ children }) {
           <NavLink href="/reakčný-čas" icon="⚡" label="Reakčný čas" />
           <NavLink href="/cas-predaja" icon="🕐" label="Čas predaja" />
           <NavLink href="/konverzia" icon="🎯" label="Konverzia leadov" />
-          <NavLink href="/aktivity" icon="📊" label="Aktivity" />
-          <NavLink href="/pipeline" icon="🚗" label="Pipeline" />
           <NavLink href="/users" icon="👥" label="Používatelia" />
           <NavLink href="/zmena-hesla" icon="🔑" label="Zmena hesla" />
         </nav>
@@ -65,8 +63,8 @@ export default function DashboardLayout({ children }) {
         <Link href="/reakčný-čas" className="flex flex-col items-center py-3 px-3 text-xs text-white">
           <span className="text-lg">⚡</span>Reakčný čas
         </Link>
-        <Link href="/aktivity" className="flex flex-col items-center py-3 px-3 text-xs text-white">
-          <span className="text-lg">📊</span>Aktivity
+        <Link href="/cas-predaja" className="flex flex-col items-center py-3 px-3 text-xs text-white">
+          <span className="text-lg">🕐</span>Čas predaja
         </Link>
       </nav>
 

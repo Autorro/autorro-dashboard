@@ -28,6 +28,9 @@ function getBrandInitial(brand) {
   return (brand||"?")[0].toUpperCase();
 }
 
+// Značky vylúčené zo zobrazenia (testovací/nerelevantný obsah)
+const EXCLUDE_BRANDS = new Set(["Bugatti"]);
+
 const SORT_OPTIONS = [
   { key:"total",   label:"Počet OP" },
   { key:"won",     label:"Počet Won" },
@@ -53,6 +56,7 @@ export default function ZnackyClient() {
   useEffect(() => { load(); }, []);
 
   const filtered = data
+    .filter(b => !EXCLUDE_BRANDS.has(b.brand))
     .filter(b => b.total >= minOp)
     .filter(b => !search || b.brand.toLowerCase().includes(search.toLowerCase()))
     .sort((a, z) => {

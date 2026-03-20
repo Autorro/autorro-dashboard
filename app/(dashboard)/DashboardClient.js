@@ -119,6 +119,42 @@ function PriceDiffBadge({ diff }) {
   return <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">{diff}% ↓</span>;
 }
 
+/* ── Predajnosť badges ── */
+function getDays(addTime) {
+  if (!addTime) return null;
+  return Math.floor((Date.now() - new Date(addTime)) / 864e5);
+}
+
+function DaysBadge({ addTime }) {
+  const days = getDays(addTime);
+  if (days === null) return <span className="text-gray-400">—</span>;
+  const cls = days < 45 ? "bg-green-100 text-green-700" : days <= 90 ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700";
+  return <span className={"px-2 py-0.5 rounded-full text-xs font-bold " + cls}>{days}d</span>;
+}
+
+function KmBadge({ km }) {
+  if (!km && km !== 0) return <span className="text-gray-400">—</span>;
+  const k = Number(km);
+  if (isNaN(k)) return <span className="text-gray-400">—</span>;
+  const label = k >= 1000 ? `${Math.round(k / 1000)}k km` : `${k} km`;
+  const cls   = k < 100_000 ? "bg-green-100 text-green-700"
+              : k < 200_000 ? "bg-gray-100 text-gray-600"
+              : k < 250_000 ? "bg-yellow-100 text-yellow-700"
+              :               "bg-red-100 text-red-700";
+  return <span className={"px-2 py-0.5 rounded-full text-xs font-bold " + cls}>{label}</span>;
+}
+
+function RokBadge({ rokRaw }) {
+  if (!rokRaw) return <span className="text-gray-400">—</span>;
+  let year;
+  if (typeof rokRaw === "number" && rokRaw > 1900) year = rokRaw;
+  else { const m = String(rokRaw).match(/\b(19|20)\d{2}\b/); year = m ? parseInt(m[0]) : null; }
+  if (!year) return <span className="text-gray-400">—</span>;
+  const age = new Date().getFullYear() - year;
+  const cls = age <= 10 ? "bg-green-100 text-green-700" : age <= 15 ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700";
+  return <span className={"px-2 py-0.5 rounded-full text-xs font-bold " + cls}>{year}</span>;
+}
+
 const REFRESH_SEC = 180; // 3 minúty
 
 function computeBrokerHealth(deals) {
@@ -631,11 +667,16 @@ export default function DashboardClient() {
                                           : <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 shrink-0">✗ Nie</span>}
                                       </div>
                                       <div className="grid grid-cols-2 gap-1 text-gray-500">
-                                        <span>#{d.id}</span><span>{fmt(d.add_time)}</span>
+                                        <span>#{d.id}</span><span><DaysBadge addTime={d.add_time} /></span>
                                         <span>Cena: <span className="font-medium text-gray-800">{fmtMoney(cenaVoz, d.currency)}</span></span>
                                         <span>Odp: <span className="font-medium text-gray-800">{fmtMoney(odAut, d.currency)}</span></span>
                                       </div>
-                                      {diff !== null && <div className="mt-1"><PriceDiffBadge diff={diff} /></div>}
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {diff !== null && <PriceDiffBadge diff={diff} />}
+                                        <RokBadge rokRaw={d._rok} />
+                                        <KmBadge km={d._km} />
+                                        {d._palivo && <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-600">{d._palivo}</span>}
+                                      </div>
                                     </div>
                                   );
                                 })}
@@ -646,11 +687,12 @@ export default function DashboardClient() {
                                   <tr className={theadCls}>
                                     <th className="px-3 py-2 text-left">ID</th>
                                     <th className="px-3 py-2 text-left">Názov dealu</th>
-                                    <th className="px-3 py-2 text-left">Otvorený</th>
+                                    <th className="px-3 py-2 text-left">Dni</th>
                                     <th className="px-3 py-2 text-left">Cena vozidla</th>
                                     <th className="px-3 py-2 text-left">Odp. cena Autorro</th>
                                     <th className="px-3 py-2 text-left">% rozdiel</th>
                                     <th className="px-3 py-2 text-left">Cena OK</th>
+                                    <th className="px-3 py-2 text-left">Predajnosť</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -673,7 +715,7 @@ export default function DashboardClient() {
                                             {d.title || "—"}
                                           </a>
                                         </td>
-                                        <td className="px-3 py-2">{fmt(d.add_time)}</td>
+                                        <td className="px-3 py-2"><DaysBadge addTime={d.add_time} /></td>
                                         <td className="px-3 py-2 font-medium">{fmtMoney(cenaVoz, d.currency)}</td>
                                         <td className="px-3 py-2">{fmtMoney(odAut, d.currency)}</td>
                                         <td className="px-3 py-2"><PriceDiffBadge diff={diff} /></td>
@@ -681,6 +723,15 @@ export default function DashboardClient() {
                                           {cenaOk
                                             ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">✓ Áno</span>
                                             : <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">✗ Nie</span>}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                          <div className="flex flex-wrap gap-1">
+                                            <RokBadge rokRaw={d._rok} />
+                                            <KmBadge km={d._km} />
+                                            {d._palivo && (
+                                              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-600">{d._palivo}</span>
+                                            )}
+                                          </div>
                                         </td>
                                       </tr>
                                     );

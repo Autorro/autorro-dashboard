@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 const CONFETTI_EMOJIS = ["🎉","🎊","⭐","✨","🌟","💥","🎈","🏆","🥇","💰","🚗"];
 const CONFETTI_COUNT  = 40;
@@ -153,6 +153,69 @@ function RokBadge({ rokRaw }) {
   const age = new Date().getFullYear() - year;
   const cls = age <= 10 ? "bg-green-100 text-green-700" : age <= 15 ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700";
   return <span className={"px-2 py-0.5 rounded-full text-xs font-bold " + cls}>{year}</span>;
+}
+
+/* ── Odporúčanie pre každý deal ── */
+function getRecommendation(deal) {
+  const days   = getDays(deal.add_time);
+  const diff   = getPriceDiff(deal[CENA_VOZIDLA], deal[ODP_AUTORRO]); // null | number
+  const km     = deal._km != null ? Number(deal._km) : null;
+  const rokRaw = deal._rok;
+  let year = null;
+  if (typeof rokRaw === "number" && rokRaw > 1900) year = rokRaw;
+  else if (rokRaw) { const m = String(rokRaw).match(/\b(19|20)\d{2}\b/); year = m ? parseInt(m[0]) : null; }
+  const age    = year ? new Date().getFullYear() - year : null;
+  const highKm = km != null && km >= 250_000;
+  const oldCar = age != null && age >= 16;
+
+  // ── 90+ dní ────────────────────────────────────────────────
+  if (days !== null && days > 90) {
+    if (diff !== null && diff > 10)
+      return { level: "critical", icon: "🚨", text: "Znížiť cenu ihneď na odporúčanú alebo vyradiť z ponuky" };
+    if (diff !== null && diff > 0)
+      return { level: "critical", icon: "🚨", text: "Znížiť cenu na odporúčanú alebo vyradiť z ponuky" };
+    if (highKm || oldCar)
+      return { level: "critical", icon: "🚨", text: "Vyradiť z ponuky – dlho inzerované, " + (highKm ? "vysoký nájazd" : "starší ročník") };
+    return { level: "critical", icon: "🔴", text: "Zvážiť vyradenie z ponuky – v inzercii viac ako 90 dní" };
+  }
+
+  // ── 45–90 dní ──────────────────────────────────────────────
+  if (days !== null && days >= 45) {
+    if (diff !== null && diff > 10)
+      return { level: "warning", icon: "⚠️", text: "Znížiť cenu – výrazne nad odporúčanou (" + diff + "%)" };
+    if (diff !== null && diff > 0)
+      return { level: "warning", icon: "⚠️", text: "Zvážiť zníženie ceny – mierne nad odporúčanou" };
+    if (highKm)
+      return { level: "warning", icon: "⚠️", text: "Monitorovať – vysoký nájazd môže spomaľovať predaj" };
+    return { level: "watch", icon: "👁️", text: "Monitorovať – v ponuke 45+ dní" };
+  }
+
+  // ── do 45 dní ─────────────────────────────────────────────
+  if (diff !== null && diff > 10)
+    return { level: "warning", icon: "⚠️", text: "Cena výrazne nad odporúčanou (" + diff + "%) – zvážiť úpravu" };
+  if (diff !== null && diff > 0)
+    return { level: "ok", icon: "💡", text: "Cena mierne nad odporúčanou – sledovať záujem" };
+
+  return { level: "ok", icon: "✅", text: "V poriadku" };
+}
+
+const REC_STYLE = {
+  critical: { bg: "bg-red-50",     border: "border-red-200",    text: "text-red-700"    },
+  warning:  { bg: "bg-amber-50",   border: "border-amber-200",  text: "text-amber-700"  },
+  watch:    { bg: "bg-blue-50",    border: "border-blue-200",   text: "text-blue-700"   },
+  ok:       { bg: "bg-green-50",   border: "border-green-200",  text: "text-green-700"  },
+};
+
+function RecommendationRow({ deal, dark }) {
+  const rec = getRecommendation(deal);
+  if (rec.level === "ok" && rec.text === "V poriadku") return null; // neskrývaj ostatné OK odporúčania
+  const s = REC_STYLE[rec.level] || REC_STYLE.ok;
+  return (
+    <div className={"mt-1.5 flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs font-medium " + s.bg + " " + s.border + " " + s.text}>
+      <span>{rec.icon}</span>
+      <span>{rec.text}</span>
+    </div>
+  );
 }
 
 const REFRESH_SEC = 180; // 3 minúty
@@ -677,6 +740,7 @@ export default function DashboardClient() {
                                         <KmBadge km={d._km} />
                                         {d._palivo && <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-600">{d._palivo}</span>}
                                       </div>
+                                      <RecommendationRow deal={d} dark={dark} />
                                     </div>
                                   );
                                 })}
@@ -704,36 +768,50 @@ export default function DashboardClient() {
                                     const rowBg   = !cenaOk && diff > 10
                                       ? (dark ? "bg-red-950" : "bg-red-50")
                                       : !cenaOk ? (dark ? "bg-yellow-950" : "bg-yellow-50") : "";
+                                    const rec     = getRecommendation(d);
+                                    const showRec = !(rec.level === "ok" && rec.text === "V poriadku");
+                                    const rs      = REC_STYLE[rec.level] || REC_STYLE.ok;
                                     return (
-                                      <tr key={d.id} className={"border-t " + subRowCls + " " + rowBg}>
-                                        <td className="px-3 py-2 text-gray-500 font-mono">#{d.id}</td>
-                                        <td className="px-3 py-2 font-medium max-w-[200px] truncate" title={d.title}>
-                                          <a href={`https://autorro.pipedrive.com/deal/${d.id}`}
-                                            target="_blank" rel="noopener noreferrer"
-                                            className="hover:underline" style={{ color: "#FF501C" }}
-                                            onClick={e => e.stopPropagation()}>
-                                            {d.title || "—"}
-                                          </a>
-                                        </td>
-                                        <td className="px-3 py-2"><DaysBadge addTime={d.add_time} /></td>
-                                        <td className="px-3 py-2 font-medium">{fmtMoney(cenaVoz, d.currency)}</td>
-                                        <td className="px-3 py-2">{fmtMoney(odAut, d.currency)}</td>
-                                        <td className="px-3 py-2"><PriceDiffBadge diff={diff} /></td>
-                                        <td className="px-3 py-2">
-                                          {cenaOk
-                                            ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">✓ Áno</span>
-                                            : <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">✗ Nie</span>}
-                                        </td>
-                                        <td className="px-3 py-2">
-                                          <div className="flex flex-wrap gap-1">
-                                            <RokBadge rokRaw={d._rok} />
-                                            <KmBadge km={d._km} />
-                                            {d._palivo && (
-                                              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-600">{d._palivo}</span>
-                                            )}
-                                          </div>
-                                        </td>
-                                      </tr>
+                                      <React.Fragment key={d.id}>
+                                        <tr className={"border-t " + subRowCls + " " + rowBg}>
+                                          <td className="px-3 py-2 text-gray-500 font-mono">#{d.id}</td>
+                                          <td className="px-3 py-2 font-medium max-w-[200px] truncate" title={d.title}>
+                                            <a href={`https://autorro.pipedrive.com/deal/${d.id}`}
+                                              target="_blank" rel="noopener noreferrer"
+                                              className="hover:underline" style={{ color: "#FF501C" }}
+                                              onClick={e => e.stopPropagation()}>
+                                              {d.title || "—"}
+                                            </a>
+                                          </td>
+                                          <td className="px-3 py-2"><DaysBadge addTime={d.add_time} /></td>
+                                          <td className="px-3 py-2 font-medium">{fmtMoney(cenaVoz, d.currency)}</td>
+                                          <td className="px-3 py-2">{fmtMoney(odAut, d.currency)}</td>
+                                          <td className="px-3 py-2"><PriceDiffBadge diff={diff} /></td>
+                                          <td className="px-3 py-2">
+                                            {cenaOk
+                                              ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">✓ Áno</span>
+                                              : <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">✗ Nie</span>}
+                                          </td>
+                                          <td className="px-3 py-2">
+                                            <div className="flex flex-wrap gap-1">
+                                              <RokBadge rokRaw={d._rok} />
+                                              <KmBadge km={d._km} />
+                                              {d._palivo && (
+                                                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-600">{d._palivo}</span>
+                                              )}
+                                            </div>
+                                          </td>
+                                        </tr>
+                                        {showRec && (
+                                          <tr className={"border-b " + (dark ? "border-gray-700" : "border-gray-100")}>
+                                            <td colSpan={8} className={"px-3 pb-2 " + (dark ? "bg-gray-900" : "bg-gray-50")}>
+                                              <span className={"inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold " + rs.bg + " " + rs.border + " " + rs.text}>
+                                                {rec.icon} {rec.text}
+                                              </span>
+                                            </td>
+                                          </tr>
+                                        )}
+                                      </React.Fragment>
                                     );
                                   })}
                                 </tbody>

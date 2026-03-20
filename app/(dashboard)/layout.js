@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: "/trend",           icon: "📈", label: "Trend zdravia" },
   { href: "/reakčný-čas",    icon: "⚡", label: "Reakčný čas" },
   { href: "/cas-predaja",     icon: "🕐", label: "Čas predaja" },
+  { href: "/znacky",          icon: "🚘", label: "Značky vozidiel" },
   { href: "/konverzia",       icon: "🎯", label: "Konverzia leadov" },
   { href: "/users",           icon: "👥", label: "Používatelia" },
   { href: "/zmena-hesla",     icon: "🔑", label: "Zmena hesla" },

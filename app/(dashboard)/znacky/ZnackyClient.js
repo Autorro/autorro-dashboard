@@ -16,12 +16,13 @@ function brandColor(name) {
 
 // Logo/emoji podľa značky
 const BRAND_EMOJI = {
-  "ŠKODA":"🟢","VOLKSWAGEN":"🔵","BMW":"🔷","AUDI":"⭕","MERCEDES-BENZ":"⭐",
-  "FORD":"🔴","OPEL":"⚡","TOYOTA":"🔴","HYUNDAI":"🟦","KIA":"⬛",
-  "SEAT":"🟠","CUPRA":"🔥","PEUGEOT":"🦁","RENAULT":"🔷","CITROËN":"⬆️",
-  "FIAT":"🇮🇹","HONDA":"⬤","MAZDA":"🌀","DACIA":"🟩","VOLVO":"🇸🇪",
-  "PORSCHE":"🐴","LEXUS":"🏅","TESLA":"⚡","MINI":"🇬🇧","LAND ROVER":"🦁",
-  "ALFA ROMEO":"🍀","JEEP":"🏔️","SUBARU":"⭐","SUZUKI":"🎌",
+  "Škoda":"🟢","Volkswagen":"🔵","BMW":"🔷","Audi":"⭕","Mercedes":"⭐",
+  "Ford":"🔴","Opel":"⚡","Toyota":"🟥","Hyundai":"🟦","Kia":"⬛",
+  "Seat":"🟠","Cupra":"🔥","Peugeot":"🦁","Renault":"🔷","Citroen":"⬆️",
+  "Fiat":"🇮🇹","Honda":"🔴","Mazda":"🌀","Dacia":"🟩","Volvo":"🇸🇪",
+  "Porsche":"🐴","Lexus":"🏅","Tesla":"⚡","Mini":"🇬🇧","Land Rover":"🦁",
+  "Alfa Romeo":"🍀","Jeep":"🏔️","Subaru":"⭐","Suzuki":"🎌","Jaguar":"🐆",
+  "Bmw":"🔷","Volkswagen":"🔵",
 };
 
 function getBrandInitial(brand) {

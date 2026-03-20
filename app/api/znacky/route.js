@@ -3,42 +3,43 @@ let cache = { data: null, timestamp: 0 };
 
 const ZNACKA_KEY = "c5d33ca43498a4e3e0e90dc8e1cfa3944107290d";
 
-/* ── Zoznam všetkých známych značiek (normalizované bez diakritiky, lowercase) ── */
-const KNOWN_BRANDS = [
-  "abarth","acura","alfa romeo","alpina","aston martin","audi","austin","avia",
-  "bentley","bmw","bugatti","buick","cadillac","chevrolet","chrysler","citroen",
-  "cupra","dacia","daewoo","daf","daihatsu","dodge","ds","ferrari","fiat","fisker",
-  "ford","gmc","honda","hummer","hyundai","infiniti","isuzu","iveco","jaguar",
-  "jeep","kia","lada","lamborghini","lancia","land rover","lexus","lincoln",
-  "lotus","mahindra","man","maserati","mazda","mclaren","mercedes","mg","mini",
-  "mitsubishi","nissan","opel","peugeot","pontiac","porsche","renault","rolls royce",
-  "rolls-royce","rover","saab","seat","skoda","skóda","smart","ssangyong","subaru",
-  "suzuki","tatra","tesla","toyota","trabant","volkswagen","volvo","volga",
-];
-
-/* Normalizuj text — odstráň diakritiku, lowercase */
+/* ── Normalizácia: diakritika + pomlčky → medzery ── */
 function norm(s) {
   return (s || "")
     .normalize("NFD").replace(/\p{Diacritic}/gu, "")
-    .toLowerCase().trim();
+    .replace(/[-_/]+/g, " ")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-/* Pokús sa rozpoznať značku z názvu dealu */
+/* ── Zoznam značiek (normalizované) ── */
+const KNOWN_BRANDS = [
+  "abarth","acura","alfa romeo","alpina","aston martin","audi","bentley","bmw",
+  "buick","cadillac","chevrolet","chrysler","citroen","cupra","dacia","daewoo",
+  "dodge","ds","ferrari","fiat","ford","gmc","honda","hummer","hyundai","infiniti",
+  "isuzu","iveco","jaguar","jeep","kia","lada","lamborghini","lancia","land rover",
+  "lexus","lincoln","lotus","mahindra","man","maserati","mazda","mclaren",
+  "mercedes","mg","mini","mitsubishi","nissan","opel","peugeot","pontiac","porsche",
+  "renault","rolls royce","rover","saab","seat","skoda","smart","ssangyong",
+  "subaru","suzuki","tatra","tesla","toyota","volkswagen","volvo",
+].sort((a, b) => b.length - a.length); // dlhšie zhody majú prednosť
+
+/* Nájdi značku kdekoľvek v titule (celé slovo) */
 function brandFromTitle(title) {
   const t = norm(title);
-  // Najprv dvojslovné (dlhšie zhody majú prednosť)
   for (const b of KNOWN_BRANDS) {
-    if (b.includes(" ") && t.startsWith(b)) return b;
-  }
-  // Potom jednoslovné — kontrolujeme len začiatok titulu
-  const firstWord = t.split(/\s+/)[0];
-  for (const b of KNOWN_BRANDS) {
-    if (!b.includes(" ") && norm(b) === firstWord) return b;
+    if (b.includes(" ")) {
+      if (t.includes(b)) return b;
+    } else {
+      // Musí byť celé slovo
+      if (new RegExp(`(^|\\s)${b}(\\s|$)`).test(t)) return b;
+    }
   }
   return null;
 }
 
-/* ── Stiahni ID→label mapu z Pipedrive a automaticky oprav premenované možnosti ── */
+/* ── Načítaj ID→label z Pipedrive + auto-oprav premenované možnosti ── */
 async function fetchZnackaMap(token, rawDeals) {
   const res  = await fetch(
     `https://api.pipedrive.com/v1/dealFields?api_token=${token}&limit=500`,
@@ -51,12 +52,7 @@ async function fetchZnackaMap(token, rawDeals) {
     map[String(opt.id)] = opt.label;
   }
 
-  /*
-   * Auto-korekcia: pre každý enum ID spočítame aké značky sa objavujú
-   * v názvoch dealov, ktoré majú toto ID. Ak väčšina (≥60%) titulkov
-   * ukazuje inú značku ako je v Pipedrive — použijeme titulkovú značku.
-   * Tým opravíme všetky premenované enum možnosti naraz.
-   */
+  // Zoskup tituly podľa ID
   const idTitles = {};
   for (const d of rawDeals) {
     const raw = String(d[ZNACKA_KEY] || "");
@@ -65,10 +61,10 @@ async function fetchZnackaMap(token, rawDeals) {
     idTitles[raw].push(d.title || "");
   }
 
+  // Pre každé ID: ak väčšina titulkov hovorí inú značku → oprav
   for (const [id, titles] of Object.entries(idTitles)) {
-    if (titles.length < 3) continue; // príliš málo dát na rozhodnutie
+    if (titles.length < 4) continue;
 
-    // Spočítaj detekované značky z titulkov
     const counts = {};
     for (const t of titles) {
       const b = brandFromTitle(t);
@@ -76,28 +72,26 @@ async function fetchZnackaMap(token, rawDeals) {
     }
     if (!Object.keys(counts).length) continue;
 
-    const [topBrand, topCount] = Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])[0];
-
+    const [[topBrand, topCount]] = Object.entries(counts).sort((a, b) => b[1] - a[1]);
     const confidence = topCount / titles.length;
-    if (confidence < 0.6) continue; // nie je to jasné
+    if (confidence < 0.60) continue;
 
-    const currentLabel = norm(map[id] || "");
-    const detectedLabel = norm(topBrand);
+    const currentNorm  = norm(map[id] || "");
+    const detectedNorm = norm(topBrand);
+    if (currentNorm === detectedNorm) continue; // zhoda — nič nerob
 
-    // Ak sa Pipedrive label líši od toho čo vidíme v titulkoch — oprav
-    if (currentLabel !== detectedLabel) {
-      // Kapitaliz prvé písmeno každého slova
-      map[id] = topBrand
-        .split(" ")
-        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(" ")
-        // Špeciálne prípady
-        .replace(/Ssangyong/, "SsangYong")
-        .replace(/Bmw/, "BMW")
-        .replace(/Mg/, "MG")
-        .replace(/Ds/, "DS");
-    }
+    // Oprav label — pekný formát
+    const corrected = topBrand
+      .split(" ")
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ")
+      .replace(/\bBmw\b/, "BMW")
+      .replace(/\bMg\b/, "MG")
+      .replace(/\bDs\b/, "DS")
+      .replace(/\bGmc\b/, "GMC")
+      .replace(/\bSsangyong\b/, "SsangYong");
+
+    map[id] = corrected;
   }
 
   return map;
@@ -110,9 +104,8 @@ function getZnacka(deal, znackaMap) {
 }
 
 async function fetchRawDeals(token) {
-  const statuses = ["open", "won", "lost"];
   const all = [];
-  for (const status of statuses) {
+  for (const status of ["open", "won", "lost"]) {
     let start = 0;
     while (true) {
       const res  = await fetch(
@@ -139,21 +132,13 @@ export async function GET(request) {
     });
   }
 
-  const token    = process.env.PIPEDRIVE_API_TOKEN;
-  const rawDeals = await fetchRawDeals(token);
-
-  // Mapa s auto-korekciou premenovaných možností
+  const token     = process.env.PIPEDRIVE_API_TOKEN;
+  const rawDeals  = await fetchRawDeals(token);
   const znackaMap = await fetchZnackaMap(token, rawDeals);
 
-  // Mapuj surové dealy na výsledok
-  const mapped = rawDeals.map(d => ({
-    status: d.status,
-    znacka: getZnacka(d, znackaMap),
-  }));
-
   const byBrand = {};
-  for (const d of mapped) {
-    const z = d.znacka;
+  for (const d of rawDeals) {
+    const z = getZnacka(d, znackaMap);
     if (!byBrand[z]) byBrand[z] = { brand: z, open: 0, won: 0, lost: 0 };
     byBrand[z][d.status]++;
   }

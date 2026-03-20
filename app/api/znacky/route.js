@@ -25,9 +25,17 @@ const KNOWN_BRANDS = [
   "subaru","suzuki","tatra","tesla","toyota","volkswagen","volvo",
 ].sort((a, b) => b.length - a.length); // dlhšie zhody majú prednosť
 
+/* Rozviň bežné skratky v titule pred detekciou */
+function expandAbbr(t) {
+  return t
+    .replace(/\bvw\b/g,  "volkswagen")
+    .replace(/\bmb\b/g,  "mercedes")
+    .replace(/\bbmw\b/g, "bmw"); // už správne, len pre istotu
+}
+
 /* Nájdi značku kdekoľvek v titule (celé slovo) */
 function brandFromTitle(title) {
-  const t = norm(title);
+  const t = expandAbbr(norm(title));
   for (const b of KNOWN_BRANDS) {
     if (b.includes(" ")) {
       if (t.includes(b)) return b;

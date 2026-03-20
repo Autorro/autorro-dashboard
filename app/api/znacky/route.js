@@ -3,6 +3,18 @@ let cache = { data: null, timestamp: 0 };
 
 const ZNACKA_KEY = "c5d33ca43498a4e3e0e90dc8e1cfa3944107290d";
 
+/*
+ * Opravy pre premenované enum možnosti v Pipedrive.
+ * Tieto ID boli kedysi iné značky — niekto ich premenoval čím sa
+ * pokazilo zobrazenie pre staré dealy. Ak to opravíš v Pipedrive,
+ * môžeš tieto overrides vymazať.
+ */
+const ZNACKA_OVERRIDES = {
+  "157": "Jaguar",   // premenované na K1, ale dealy sú Jaguar
+  "158": "Jeep",     // premenované na Kaipan, ale dealy sú Jeep
+  "182": "Porsche",  // premenované na Rolls-Royce, ale dealy sú Porsche
+};
+
 /* ── Stiahni aktuálnu ID→label mapu priamo z Pipedrive ── */
 async function fetchZnackaMap(token) {
   const res  = await fetch(
@@ -15,6 +27,8 @@ async function fetchZnackaMap(token) {
   for (const opt of (field?.options || [])) {
     map[String(opt.id)] = opt.label;
   }
+  // Aplikuj opravy pre premenované možnosti
+  Object.assign(map, ZNACKA_OVERRIDES);
   return map;
 }
 

@@ -25,12 +25,21 @@ const KNOWN_BRANDS = [
   "subaru","suzuki","tatra","tesla","toyota","volkswagen","volvo",
 ].sort((a, b) => b.length - a.length); // dlhšie zhody majú prednosť
 
-/* Rozviň bežné skratky v titule pred detekciou */
+/* Rozviň skratky a oprav preklepy pred detekciou značky */
 function expandAbbr(t) {
   return t
-    .replace(/\bvw\b/g,  "volkswagen")
+    // VW skratky a preklepy
+    .replace(/\bvw\b/g,          "volkswagen")
+    .replace(/\bwv\b/g,          "volkswagen")
+    .replace(/\bvolkwagen\b/g,   "volkswagen")
+    .replace(/\bvolkswagen\b/g,  "volkswagen")
+    .replace(/\bvolskwagen\b/g,  "volkswagen")
+    .replace(/\bwolksvagen\b/g,  "volkswagen")
+    // VW modely (keď titul začína modelom bez značky)
+    .replace(/^(golf|passat|pasat|tiguan|touran|touareg|arteon|caddy|multivan|caravelle|scirocco|sharan|amarok|t-roc|t roc|troc|id\.?3|id\.?4|id\.?5)\b/, "volkswagen $1")
+    // Mercedes skratky
     .replace(/\bmb\b/g,  "mercedes")
-    .replace(/\bbmw\b/g, "bmw"); // už správne, len pre istotu
+    .replace(/\bamg\b/g, "mercedes");
 }
 
 /* Nájdi značku kdekoľvek v titule (celé slovo) */

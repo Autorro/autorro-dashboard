@@ -107,15 +107,17 @@ export default function SalesLeaderboardClient() {
     allTimeByBroker[d.owner]=(allTimeByBroker[d.owner]||0)+toEur(d.cenaVozidla,d.currency);
   }
 
-  /* ── Sumy pre tento mesiac (vždy, bez ohľadu na filter) ── */
+  /* ── Sumy pre tento mesiac ── */
   const tmr = thisMonthRange();
-  const thisMonthByBroker = {};
+  const thisMonthByBroker     = {};
+  const thisMonthUverByBroker = {};
   for(const d of allDeals){
     if(EXCLUDE.some(e=>norm(e)===norm(d.owner))) continue;
     if(!d.wonTime) continue;
     const t=new Date(d.wonTime);
     if(t<tmr.from||t>tmr.to) continue;
-    thisMonthByBroker[d.owner]=(thisMonthByBroker[d.owner]||0)+toEur(d.cenaVozidla,d.currency);
+    thisMonthByBroker[d.owner]    =(thisMonthByBroker[d.owner]    ||0)+toEur(d.cenaVozidla,d.currency);
+    thisMonthUverByBroker[d.owner]=(thisMonthUverByBroker[d.owner]||0)+(d.proviziaUver||0);
   }
 
   /* ── Filter ── */
@@ -134,17 +136,19 @@ export default function SalesLeaderboardClient() {
   /* ── Agregácia ── */
   const bMap={};
   for(const d of filtered){
-    if(!bMap[d.owner]) bMap[d.owner]={count:0,total:0,deals:[]};
+    if(!bMap[d.owner]) bMap[d.owner]={count:0,total:0,totalUver:0,deals:[]};
     bMap[d.owner].count++;
-    bMap[d.owner].total+=toEur(d.cenaVozidla,d.currency);
+    bMap[d.owner].total    +=toEur(d.cenaVozidla,d.currency);
+    bMap[d.owner].totalUver+=(d.proviziaUver||0);
     bMap[d.owner].deals.push(d);
   }
   const brokers = Object.entries(bMap)
     .map(([name,s])=>({
       name, ...s,
-      avg:s.total/s.count,
+      avg:          s.total/s.count,
       allTimeTotal: allTimeByBroker[name]||0,
-      thisMonth:    thisMonthByBroker[name]||0,
+      thisMonth:    thisMonthByBroker[name]    ||0,
+      thisMonthUver:thisMonthUverByBroker[name]||0,
     }))
     .sort((a,b)=>b.total-a.total||b.count-a.count);
 
@@ -154,6 +158,14 @@ export default function SalesLeaderboardClient() {
   const totalThisMonth = Object.values(thisMonthByBroker)
     .filter((_,i)=>!EXCLUDE.some(e=>norm(e)===norm(Object.keys(thisMonthByBroker)[i])))
     .reduce((s,v)=>s+v,0);
+
+  /* ── Financovanie – celkové sumy za obdobie ── */
+  const totalUverProviziaSum = brokers.reduce((s,b)=>s+b.totalUver,0);
+  const totalUverEarned      = brokers.reduce((s,b)=>{
+    const {tier}=getTierProgress(b.allTimeTotal);
+    return s+b.totalUver*(tier.uverova/100);
+  },0);
+  const countUverDeals = filtered.filter(d=>(d.proviziaUver||0)>0).length;
 
   /* ── Skeleton ── */
   if(loading) return(
@@ -196,6 +208,37 @@ export default function SalesLeaderboardClient() {
         ))}
       </div>
 
+      {/* ── Banner: Financovanie (zobrazí sa iba ak sú dáta) ── */}
+      {totalUverProviziaSum > 0 && (
+        <div className="rounded-2xl p-5 text-white shadow-sm"
+          style={{background:"linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 60%, #2563eb 100%)"}}>
+          <p className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-3">
+            💳 Príjmy z financovania – {period === "Vlastné" ? "vlastné obdobie" : period.toLowerCase()}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white/10 rounded-xl px-4 py-3">
+              <p className="text-xs text-white/60 mb-0.5">Celkové provízie z financovania</p>
+              <p className="text-2xl font-extrabold">{fmtEur(totalUverProviziaSum)}</p>
+              <p className="text-xs text-white/50 mt-0.5">{countUverDeals} dealov s financovaním</p>
+            </div>
+            <div className="bg-white/10 rounded-xl px-4 py-3">
+              <p className="text-xs text-white/60 mb-0.5">Zárobky maklérov z financovania</p>
+              <p className="text-2xl font-extrabold">{fmtEur(totalUverEarned)}</p>
+              <p className="text-xs text-white/50 mt-0.5">podľa kariérnych % (20–25 %)</p>
+            </div>
+            <div className="bg-white/10 rounded-xl px-4 py-3">
+              <p className="text-xs text-white/60 mb-0.5">Zostatok po vyplatení maklérov</p>
+              <p className="text-2xl font-extrabold">{fmtEur(totalUverProviziaSum - totalUverEarned)}</p>
+              <p className="text-xs text-white/50 mt-0.5">
+                {totalUverProviziaSum > 0
+                  ? `${Math.round(((totalUverProviziaSum - totalUverEarned) / totalUverProviziaSum) * 100)} % z celkového objemu`
+                  : '—'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Filtre ── */}
       <div className="bg-white rounded-2xl shadow-sm p-4 flex flex-wrap gap-4 items-end">
         <div className="flex flex-col gap-1.5">
@@ -235,16 +278,20 @@ export default function SalesLeaderboardClient() {
 
       {/* ── Legenda pozícií ── */}
       <div className="bg-white rounded-2xl shadow-sm p-4">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Kariérne pozície (kumulatívny objem dealov)</p>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          Kariérne pozície · hotovostná % / úverová %
+        </p>
         <div className="flex flex-wrap gap-2">
           {TIERS.map(t=>(
             <div key={t.id} className="flex items-center gap-2 px-3 py-2 rounded-xl"
               style={{backgroundColor:t.light,border:`1.5px solid ${t.color}30`}}>
-              <span className="text-xs font-extrabold px-1.5 py-0.5 rounded" style={{color:t.color,backgroundColor:t.color+"18"}}>{t.id}</span>
+              <span className="text-xs font-extrabold px-1.5 py-0.5 rounded"
+                style={{color:t.color,backgroundColor:t.color+"18"}}>{t.id}</span>
               <span className="text-xs text-gray-500 font-medium">
                 {t.max===Infinity?`${fmtEur(t.min)}+`:`${fmtEur(t.min)}–${fmtEur(t.max)}`}
               </span>
               <span className="text-xs font-bold" style={{color:t.color}}>{t.hotovostna}%</span>
+              <span className="text-xs text-blue-500 font-semibold">/ 💳 {t.uverova}%</span>
             </div>
           ))}
         </div>
@@ -262,13 +309,23 @@ export default function SalesLeaderboardClient() {
             const isExpanded=expanded===b.name;
             const sharePct=totalRevenue?(b.total/totalRevenue*100):0;
             const {tier,pct:tierPct,remaining,next}=getTierProgress(b.allTimeTotal);
-            const earned=b.total*(tier.hotovostna/100);
-            const earnedMonth=b.thisMonth*(tier.hotovostna/100);
-            const ac=avatarColor(b.name);
-            const isTop3=i<3;
+
+            /* ── Zárobky ── */
+            const earned          = b.total         * (tier.hotovostna/100);
+            const earnedUver      = b.totalUver      * (tier.uverova   /100);
+            const earnedMonth     = b.thisMonth      * (tier.hotovostna/100);
+            const earnedMonthUver = b.thisMonthUver  * (tier.uverova   /100);
+            const earnedTotal     = earned     + earnedUver;
+            const earnedMonthTotal= earnedMonth+ earnedMonthUver;
+            const hasUverInPeriod = b.totalUver > 0;
+            const hasUverDeals    = b.deals.some(d=>(d.proviziaUver||0)>0);
+
+            const ac    = avatarColor(b.name);
+            const isTop3= i<3;
 
             return(
-              <div key={b.name} className="bg-white rounded-2xl shadow-sm overflow-hidden transition-shadow hover:shadow-md"
+              <div key={b.name}
+                className="bg-white rounded-2xl shadow-sm overflow-hidden transition-shadow hover:shadow-md"
                 style={isTop3?{borderLeft:`4px solid ${["#f59e0b","#9ca3af","#b45309"][i]}`}:{borderLeft:"4px solid transparent"}}>
 
                 {/* ── Hlavný riadok ── */}
@@ -282,34 +339,27 @@ export default function SalesLeaderboardClient() {
                       {initials(b.name)}
                     </div>
                     {isTop3&&(
-                      <span className="absolute -top-1.5 -right-1.5 text-base leading-none">
-                        {MEDALS[i]}
-                      </span>
+                      <span className="absolute -top-1.5 -right-1.5 text-base leading-none">{MEDALS[i]}</span>
                     )}
                     {!isTop3&&(
-                      <span className="absolute -top-1.5 -right-1.5 text-xs font-bold text-gray-400 bg-white rounded-full px-0.5">
-                        #{i+1}
-                      </span>
+                      <span className="absolute -top-1.5 -right-1.5 text-xs font-bold text-gray-400 bg-white rounded-full px-0.5">#{i+1}</span>
                     )}
                   </div>
 
-                  {/* Meno + tier + progress ── */}
+                  {/* Meno + tier + progress */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-0.5">
                       <p className="font-bold text-gray-900 text-sm truncate">{b.name}</p>
-                      {/* Tier badge */}
                       <span className="text-xs font-extrabold px-2 py-0.5 rounded-md"
                         style={{backgroundColor:tier.light,color:tier.color,border:`1.5px solid ${tier.color}40`}}>
                         {tier.id}
                       </span>
-                      {/* Tento mesiac badge */}
-                      {b.thisMonth>0&&(
+                      {earnedMonthTotal>0&&(
                         <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
-                          📅 {fmtEur(earnedMonth)} tento mes.
+                          📅 {fmtEur(earnedMonthTotal)} tento mes.
                         </span>
                       )}
                     </div>
-                    {/* Tier progress bar */}
                     <div className="flex items-center gap-2">
                       <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden flex-1 max-w-[160px]">
                         <div className="h-full rounded-full transition-all"
@@ -329,10 +379,20 @@ export default function SalesLeaderboardClient() {
                     <p className="text-xs text-gray-400">aut</p>
                   </div>
 
-                  {/* Obrat + zarobené */}
-                  <div className="flex-shrink-0 text-right">
+                  {/* Obrat + zárobky */}
+                  <div className="flex-shrink-0 text-right min-w-[120px]">
                     <p className="text-base font-extrabold text-gray-900">{fmtEur(b.total)}</p>
-                    <p className="text-xs font-bold text-emerald-600">zarobil: {fmtEur(earned)}</p>
+                    {hasUverInPeriod ? (
+                      <div className="text-xs mt-0.5 space-y-0.5">
+                        <p className="text-emerald-600 font-semibold">predaj: {fmtEur(earned)}</p>
+                        <p className="text-blue-600 font-semibold">💳 financ.: {fmtEur(earnedUver)}</p>
+                        <p className="font-extrabold text-gray-800 border-t border-gray-100 pt-0.5">
+                          = {fmtEur(earnedTotal)}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-xs font-bold text-emerald-600">zarobil: {fmtEur(earned)}</p>
+                    )}
                   </div>
 
                   <span className="text-gray-300 flex-shrink-0 ml-1 text-sm">{isExpanded?"▲":"▼"}</span>
@@ -343,46 +403,94 @@ export default function SalesLeaderboardClient() {
                   <div className="border-t border-gray-100">
 
                     {/* Info karta */}
-                    <div className="px-5 py-4 grid grid-cols-2 sm:grid-cols-4 gap-4"
-                      style={{backgroundColor:tier.light}}>
-                      {[
-                        {label:"Kariérna pozícia",   val:<span className="font-extrabold text-lg" style={{color:tier.color}}>{tier.id}</span>},
-                        {label:"Kariérny objem",     val:<span className="font-extrabold text-base text-gray-900">{fmtEur(b.allTimeTotal)}</span>},
-                        {label:"Zarobené (obdobie)", val:<span className="font-extrabold text-base text-emerald-700">{fmtEur(earned)}</span>},
-                        {label:"Zarobené (mes.)",    val:<span className="font-extrabold text-base text-emerald-700">{fmtEur(earnedMonth)}</span>},
-                      ].map(s=>(
-                        <div key={s.label}>
-                          <p className="text-xs text-gray-500 mb-0.5">{s.label}</p>
-                          {s.val}
+                    <div className="px-5 py-4" style={{backgroundColor:tier.light}}>
+
+                      {/* Základné info */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                        <div>
+                          <p className="text-xs text-gray-500 mb-0.5">Kariérna pozícia</p>
+                          <span className="font-extrabold text-lg" style={{color:tier.color}}>{tier.id}</span>
                         </div>
-                      ))}
-                      {next&&(
-                        <div className="col-span-2 sm:col-span-4">
-                          <p className="text-xs text-gray-500 mb-1">Postup na {next.id} — chýba {fmtEur(remaining)}</p>
-                          <div className="h-2 bg-white rounded-full overflow-hidden">
-                            <div className="h-full rounded-full transition-all"
-                              style={{width:tierPct+"%",backgroundColor:tier.color}}/>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-0.5">Kariérny objem</p>
+                          <span className="font-extrabold text-base text-gray-900">{fmtEur(b.allTimeTotal)}</span>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-0.5">Zárobky tento mes.</p>
+                          <span className="font-extrabold text-base text-emerald-700">{fmtEur(earnedMonthTotal)}</span>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-0.5">Predané (obdobie)</p>
+                          <span className="font-extrabold text-base text-gray-900">{b.count} aut</span>
+                        </div>
+                        {next&&(
+                          <div className="col-span-2 sm:col-span-4">
+                            <p className="text-xs text-gray-500 mb-1">Postup na {next.id} — chýba {fmtEur(remaining)}</p>
+                            <div className="h-2 bg-white rounded-full overflow-hidden">
+                              <div className="h-full rounded-full transition-all"
+                                style={{width:tierPct+"%",backgroundColor:tier.color}}/>
+                            </div>
+                            <p className="text-xs text-gray-400 mt-0.5">{tierPct.toFixed(0)}% splnené</p>
                           </div>
-                          <p className="text-xs text-gray-400 mt-0.5">{tierPct.toFixed(0)}% splnené</p>
+                        )}
+                      </div>
+
+                      {/* Zárobkový rozklad */}
+                      <div className={`rounded-xl overflow-hidden border ${hasUverInPeriod ? "border-blue-200" : "border-emerald-200"}`}>
+                        <div className={`px-4 py-2 text-xs font-semibold uppercase tracking-wider ${hasUverInPeriod ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"}`}>
+                          💰 Zárobky za obdobie
                         </div>
-                      )}
+                        <div className={`grid divide-x ${hasUverInPeriod ? "grid-cols-3 divide-blue-100" : "grid-cols-1"} bg-white`}>
+                          <div className="px-4 py-3">
+                            <p className="text-xs text-gray-400 mb-0.5">
+                              Provízia z predaja <span className="font-bold" style={{color:tier.color}}>({tier.hotovostna}%)</span>
+                            </p>
+                            <p className="text-xl font-extrabold text-emerald-700">{fmtEur(earned)}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">z obratu {fmtEur(b.total)}</p>
+                          </div>
+                          {hasUverInPeriod && <>
+                            <div className="px-4 py-3">
+                              <p className="text-xs text-gray-400 mb-0.5">
+                                💳 Provízia z financovania <span className="font-bold text-blue-600">({tier.uverova}%)</span>
+                              </p>
+                              <p className="text-xl font-extrabold text-blue-700">{fmtEur(earnedUver)}</p>
+                              <p className="text-xs text-gray-400 mt-0.5">z financovania {fmtEur(b.totalUver)}</p>
+                            </div>
+                            <div className="px-4 py-3 bg-gray-50">
+                              <p className="text-xs text-gray-400 mb-0.5">Celkovo zarobené</p>
+                              <p className="text-xl font-extrabold text-gray-900">{fmtEur(earnedTotal)}</p>
+                              <p className="text-xs text-gray-400 mt-0.5">predaj + financovanie</p>
+                            </div>
+                          </>}
+                        </div>
+                      </div>
+
                     </div>
 
                     {/* Mobile karty dealov */}
                     <div className="md:hidden divide-y divide-gray-100">
                       {b.deals.sort((a,z)=>new Date(z.wonTime)-new Date(a.wonTime)).map(d=>{
                         const orig=fmtOrig(d.cenaVozidla,d.currency);
-                        const eur=fmtEur(toEur(d.cenaVozidla,d.currency));
+                        const eur =fmtEur(toEur(d.cenaVozidla,d.currency));
                         return(
-                          <div key={d.id} className="px-4 py-3 flex justify-between items-start">
-                            <div>
-                              <p className="font-medium text-gray-800 text-sm">{d.title}</p>
-                              <p className="text-xs text-gray-400">{fmtDate(d.wonTime)}</p>
+                          <div key={d.id} className="px-4 py-3">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-medium text-gray-800 text-sm">{d.title}</p>
+                                <p className="text-xs text-gray-400">{fmtDate(d.wonTime)}</p>
+                              </div>
+                              <div className="text-right ml-2">
+                                <p className="font-bold text-green-700 text-sm whitespace-nowrap">{orig??eur}</p>
+                                {orig&&<p className="text-xs text-gray-400">≈ {eur}</p>}
+                              </div>
                             </div>
-                            <div className="text-right ml-2">
-                              <p className="font-bold text-green-700 text-sm whitespace-nowrap">{orig??eur}</p>
-                              {orig&&<p className="text-xs text-gray-400">≈ {eur}</p>}
-                            </div>
+                            {(d.proviziaUver||0)>0&&(
+                              <div className="mt-1.5 flex items-center gap-2">
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-semibold">
+                                  💳 Financovanie: {fmtEur(d.proviziaUver)} → zárobek {fmtEur(d.proviziaUver*(tier.uverova/100))}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -396,22 +504,42 @@ export default function SalesLeaderboardClient() {
                           <th className="px-5 py-2 text-left font-semibold">Predané</th>
                           <th className="px-5 py-2 text-right font-semibold">Pôv. hodnota</th>
                           <th className="px-5 py-2 text-right font-semibold">EUR</th>
-                          <th className="px-5 py-2 text-right font-semibold">Zárobek</th>
+                          <th className="px-5 py-2 text-right font-semibold">Zárobek predaj</th>
+                          {hasUverDeals&&<th className="px-5 py-2 text-right font-semibold">💳 Financovanie</th>}
+                          {hasUverDeals&&<th className="px-5 py-2 text-right font-semibold text-gray-700">Spolu</th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {b.deals.sort((a,z)=>new Date(z.wonTime)-new Date(a.wonTime)).map(d=>{
-                          const orig=fmtOrig(d.cenaVozidla,d.currency);
-                          const eur=toEur(d.cenaVozidla,d.currency);
+                          const orig     = fmtOrig(d.cenaVozidla,d.currency);
+                          const eur      = toEur(d.cenaVozidla,d.currency);
+                          const eP       = eur*(tier.hotovostna/100);
+                          const eU       = (d.proviziaUver||0)*(tier.uverova/100);
+                          const hasUver  = (d.proviziaUver||0)>0;
                           return(
-                            <tr key={d.id} className="hover:bg-gray-50">
+                            <tr key={d.id} className={`hover:bg-gray-50 ${hasUver?"bg-blue-50/30":""}`}>
                               <td className="px-5 py-2.5 font-medium text-gray-800">{d.title}</td>
                               <td className="px-5 py-2.5 text-gray-500">{fmtDate(d.wonTime)}</td>
                               <td className="px-5 py-2.5 text-right">
                                 {orig?<span className="font-semibold text-blue-700">{orig}</span>:<span className="text-gray-300">—</span>}
                               </td>
                               <td className="px-5 py-2.5 text-right font-bold text-gray-800">{fmtEur(eur)}</td>
-                              <td className="px-5 py-2.5 text-right font-bold text-emerald-700">{fmtEur(eur*(tier.hotovostna/100))}</td>
+                              <td className="px-5 py-2.5 text-right font-bold text-emerald-700">{fmtEur(eP)}</td>
+                              {hasUverDeals&&(
+                                <td className="px-5 py-2.5 text-right font-bold text-blue-600">
+                                  {hasUver?(
+                                    <span className="inline-flex flex-col items-end">
+                                      <span>{fmtEur(eU)}</span>
+                                      <span className="text-xs text-gray-400 font-normal">z {fmtEur(d.proviziaUver)}</span>
+                                    </span>
+                                  ):"—"}
+                                </td>
+                              )}
+                              {hasUverDeals&&(
+                                <td className="px-5 py-2.5 text-right font-extrabold text-gray-900">
+                                  {fmtEur(eP+eU)}
+                                </td>
+                              )}
                             </tr>
                           );
                         })}
@@ -421,6 +549,12 @@ export default function SalesLeaderboardClient() {
                           <td colSpan={3} className="px-5 py-2.5 text-sm font-semibold text-emerald-800">Spolu (EUR)</td>
                           <td className="px-5 py-2.5 text-right font-extrabold text-gray-900">{fmtEur(b.total)}</td>
                           <td className="px-5 py-2.5 text-right font-extrabold text-emerald-800">{fmtEur(earned)}</td>
+                          {hasUverDeals&&(
+                            <td className="px-5 py-2.5 text-right font-extrabold text-blue-800">{fmtEur(earnedUver)}</td>
+                          )}
+                          {hasUverDeals&&(
+                            <td className="px-5 py-2.5 text-right font-extrabold text-gray-900">{fmtEur(earnedTotal)}</td>
+                          )}
                         </tr>
                       </tfoot>
                     </table>

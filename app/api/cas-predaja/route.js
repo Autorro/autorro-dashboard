@@ -1,8 +1,9 @@
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from '@/lib/supabase'
+import { createCache } from '@/lib/pipedrive'
+import { INZEROVANE_STAGES } from '@/lib/constants'
 
-const INZEROVANE = [13, 31, 34, 22];
-const CACHE_TTL = 10 * 60 * 1000;
-let cache = { data: null, timestamp: 0 };
+const CACHE_TTL = 10 * 60 * 1000
+const cache     = createCache(CACHE_TTL)
 
 // Fetch Pipedrive deal details in batches of 10
 async function fetchDealDetails(dealIds, apiToken) {
@@ -17,7 +18,7 @@ async function fetchDealDetails(dealIds, apiToken) {
         );
         const json = await res.json();
         if (json.data) details[id] = json.data;
-      } catch {}
+      } catch (e) { console.warn('[cas-predaja] Detail dealu', id, 'sa nepodarilo načítať:', e.message) }
     }));
   }
   return details;
@@ -25,15 +26,11 @@ async function fetchDealDetails(dealIds, apiToken) {
 
 async function fetchData() {
   const apiToken = process.env.PIPEDRIVE_API_TOKEN;
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  );
 
   const { data, error } = await supabase
     .from("stage_changes")
     .select("deal_id, deal_title, owner_name, from_stage, to_stage, changed_at")
-    .or(`to_stage.in.(${INZEROVANE.join(",")}),from_stage.in.(${INZEROVANE.join(",")})`)
+    .or(`to_stage.in.(${INZEROVANE_STAGES.join(",")}),from_stage.in.(${INZEROVANE_STAGES.join(",")})`)
     .order("changed_at", { ascending: true });
 
   if (error) throw new Error(error.message);
@@ -50,8 +47,8 @@ async function fetchData() {
         exits: [],
       };
     }
-    if (INZEROVANE.includes(row.to_stage))   dealMap[row.deal_id].entries.push(new Date(row.changed_at));
-    if (INZEROVANE.includes(row.from_stage)) dealMap[row.deal_id].exits.push(new Date(row.changed_at));
+    if (INZEROVANE_STAGES.includes(row.to_stage))   dealMap[row.deal_id].entries.push(new Date(row.changed_at));
+    if (INZEROVANE_STAGES.includes(row.from_stage)) dealMap[row.deal_id].exits.push(new Date(row.changed_at));
   }
 
   // Calculate duration per deal
@@ -118,13 +115,13 @@ async function fetchData() {
 }
 
 export async function GET() {
-  const now = Date.now();
-  if (cache.data && now - cache.timestamp < CACHE_TTL) {
-    return Response.json(cache.data, { headers: { "X-Cache": "HIT" } });
-  }
   try {
+    const cached = cache.get();
+    if (cached !== null) {
+      return Response.json(cached, { headers: { "X-Cache": "HIT" } });
+    }
     const data = await fetchData();
-    cache = { data, timestamp: now };
+    cache.set(data);
     return Response.json(data, { headers: { "X-Cache": "MISS" } });
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });

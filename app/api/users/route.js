@@ -55,7 +55,8 @@ export async function DELETE(request) {
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 
-  if (!id || typeof id !== 'string' || id.length < 10) {
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!id || !UUID_RE.test(id)) {
     return Response.json({ error: 'Neplatné ID' }, { status: 400 })
   }
 

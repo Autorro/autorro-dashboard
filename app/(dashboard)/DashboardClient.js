@@ -1,5 +1,6 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { EXCLUDE, CENA_KEY, ODP_AUTORRO, CENA_VOZIDLA } from "@/lib/constants";
 
 const CONFETTI_EMOJIS = ["🎉","🎊","⭐","✨","🌟","💥","🎈","🏆","🥇","💰","🚗"];
 const CONFETTI_COUNT  = 40;
@@ -62,10 +63,6 @@ const OFFICES = {
   "KE": ["Ján Tej", "Adrián Šomšág", "Viliam Baran", "Jaroslav Hažlinský", "Martin Živčák", "Ján Slivka"]
 };
 
-const EXCLUDE       = ["Development", "Tomáš Martiš", "Miroslav Hrehor", "Peter Hudec", "Jaroslav Kováč"];
-const CENA_KEY      = "880011fdbacbc3eee50103ec49001ac8abd56ae1"; // Cena je OK (enum, 100 = áno)
-const ODP_AUTORRO   = "b4d54b0e06789b713abe1062178c19490259e00a"; // Odporúčaná cena - AUTORRO
-const CENA_VOZIDLA  = "7bc01b48cc10642c58f19ce14bb33fe8abb7bb97"; // Cena vozidla
 
 function norm(s) {
   return (s || "").normalize("NFD").replace(/\p{Diacritic}/gu, "").trim().toLowerCase();
@@ -260,6 +257,8 @@ export default function DashboardClient() {
   const [trendCustomTo,   setTrendCustomTo]   = useState('');
   const [trendSnapshots,  setTrendSnapshots]  = useState(null); // null = ešte nenačítané
   const [trendLoading,    setTrendLoading]    = useState(false);
+  const [loadError,   setLoadError]   = useState(false);
+  const [trendError,  setTrendError]  = useState(false);
 
   function loadDeals(force = false) {
     setRefreshing(true);
@@ -285,7 +284,7 @@ export default function DashboardClient() {
           prices,
         }]);
       })
-      .catch(() => { setLoading(false); setRefreshing(false); });
+      .catch(() => { setLoading(false); setRefreshing(false); setLoadError(true); });
   }
 
   function daysAgo(n) {
@@ -302,11 +301,11 @@ export default function DashboardClient() {
     else if (period === 'year')   from = new Date().getFullYear() + '-01-01';
     else if (period === 'custom') { from = customFrom; to = customTo || today; }
     if (!from) return;
-    setTrendLoading(true);
+    setTrendError(false); setTrendLoading(true);
     fetch(`/api/trend-zdravia?from=${from}&to=${to}`)
       .then(r => r.json())
       .then(res => { setTrendSnapshots(res.snapshots || []); setTrendLoading(false); })
-      .catch(() => setTrendLoading(false));
+      .catch(() => { setTrendLoading(false); setTrendError(true); });
   }
 
   useEffect(() => { loadDeals(false); }, []);
@@ -381,48 +380,44 @@ export default function DashboardClient() {
     return { name: o, total: od.length, ok, pct };
   }).sort((a, b) => b.pct - a.pct);
 
-  // ── Výpočet trendu (závisí od office filtra, recomputuje sa pri každom renderi) ──
-  const officeNamesForTrend = office === "Všetky" ? null : (OFFICES[office] || []);
-  let trendResult = null;
-  if (trendSnapshots && trendSnapshots.length > 0) {
+  // ── Výpočet trendu (memoizovaný – prepočíta sa iba pri zmene trendSnapshots alebo office) ──
+  const trendResult = useMemo(() => {
+    if (!trendSnapshots || trendSnapshots.length === 0) return null;
+    const officeNamesForTrend = office === "Všetky" ? null : (OFFICES[office] || []);
     const byDate = {};
     trendSnapshots.forEach(r => {
       if (!byDate[r.snapshot_date]) byDate[r.snapshot_date] = [];
       byDate[r.snapshot_date].push(r);
     });
     const dates = Object.keys(byDate).sort();
-    if (dates.length >= 2) {
-      const startDate = dates[0];
-      const endDate   = dates[dates.length - 1];
-      const agg = rows => {
-        const f = officeNamesForTrend
-          ? rows.filter(r => nameMatchesOffice(r.owner_name, officeNamesForTrend))
-          : rows;
-        const t = f.reduce((s, r) => s + r.total, 0);
-        const k = f.reduce((s, r) => s + r.cena_ok, 0);
-        return { total: t, ok: k, pct: t > 0 ? Math.round((k / t) * 100) : 0 };
-      };
-      const startAgg = agg(byDate[startDate]);
-      const endAgg   = agg(byDate[endDate]);
-      const delta    = endAgg.pct - startAgg.pct;
-      const allNames = [...new Set(trendSnapshots.map(r => r.owner_name))]
-        .filter(n => !officeNamesForTrend || nameMatchesOffice(n, officeNamesForTrend));
-      const trendBrokers = allNames.map(name => {
-        const s = byDate[startDate]?.find(r => r.owner_name === name);
-        const e = byDate[endDate]?.find(r => r.owner_name === name);
-        const d = (s && e) ? Math.round((e.health_pct - s.health_pct) * 10) / 10 : null;
-        return { name, startPct: s?.health_pct ?? null, endPct: e?.health_pct ?? null, delta: d };
-      }).filter(b => b.endPct !== null).sort((a, b) => (b.delta ?? 0) - (a.delta ?? 0));
-      // Sparkline: overall pct per date
-      const sparkline = dates.map(date => {
-        const a = agg(byDate[date]);
-        return { date, pct: a.pct };
-      });
-      trendResult = { startDate, endDate, startAgg, endAgg, delta, trendBrokers, dates, sparkline };
-    } else if (dates.length === 1) {
-      trendResult = { singleDate: dates[0] };
-    }
-  }
+    if (dates.length < 2) return { singleDate: dates[0] || null };
+    const startDate = dates[0];
+    const endDate   = dates[dates.length - 1];
+    const agg = rows => {
+      const f = officeNamesForTrend
+        ? rows.filter(r => nameMatchesOffice(r.owner_name, officeNamesForTrend))
+        : rows;
+      const t = f.reduce((s, r) => s + r.total, 0);
+      const k = f.reduce((s, r) => s + r.cena_ok, 0);
+      return { total: t, ok: k, pct: t > 0 ? Math.round((k / t) * 100) : 0 };
+    };
+    const startAgg = agg(byDate[startDate]);
+    const endAgg   = agg(byDate[endDate]);
+    const delta    = endAgg.pct - startAgg.pct;
+    const allNames = [...new Set(trendSnapshots.map(r => r.owner_name))]
+      .filter(n => !officeNamesForTrend || nameMatchesOffice(n, officeNamesForTrend));
+    const trendBrokers = allNames.map(name => {
+      const s = byDate[startDate]?.find(r => r.owner_name === name);
+      const e = byDate[endDate]?.find(r => r.owner_name === name);
+      const d = (s && e) ? Math.round((e.health_pct - s.health_pct) * 10) / 10 : null;
+      return { name, startPct: s?.health_pct ?? null, endPct: e?.health_pct ?? null, delta: d };
+    }).filter(b => b.endPct !== null).sort((a, b) => (b.delta ?? 0) - (a.delta ?? 0));
+    const sparkline = dates.map(date => {
+      const a = agg(byDate[date]);
+      return { date, pct: a.pct };
+    });
+    return { startDate, endDate, startAgg, endAgg, delta, trendBrokers, dates, sparkline };
+  }, [trendSnapshots, office]);
 
   return (
     <div className={"min-h-screen " + bg} style={bgStyle}>
@@ -486,6 +481,12 @@ export default function DashboardClient() {
               ))}
             </div>
             <div className={"rounded-xl h-64 " + (dark ? "bg-[#5c1a42]" : "bg-gray-100")} />
+          </div>
+        )}
+
+        {loadError && !loading && (
+          <div className={"rounded-xl p-4 mb-6 text-sm border " + (dark ? "bg-red-950 border-red-800 text-red-300" : "bg-red-50 border-red-200 text-red-700")}>
+            ⚠️ Nepodarilo sa načítať dáta z Pipedrive. Skúste obnoviť stránku.
           </div>
         )}
 
@@ -718,6 +719,14 @@ export default function DashboardClient() {
             {trendLoading && (
               <div className="flex items-center gap-2 py-4 text-sm" style={{ color: "#FF501C" }}>
                 <span className="animate-spin">⟳</span> Načítavam dáta…
+              </div>
+            )}
+
+            {/* Chyba pri načítaní */}
+            {!trendLoading && trendError && (
+              <div className={"rounded-lg p-4 text-sm text-center " + (dark ? "bg-red-950 border border-red-800 text-red-300" : "bg-red-50 border border-red-200 text-red-700")}>
+                <p className="text-2xl mb-2">⚠️</p>
+                <p className="font-medium">Nepodarilo sa načítať historické dáta</p>
               </div>
             )}
 

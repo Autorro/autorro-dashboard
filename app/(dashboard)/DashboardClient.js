@@ -868,7 +868,7 @@ export default function DashboardClient() {
 
             {/* Trend result */}
             {!trendLoading && trendResult && !trendResult.singleDate && (() => {
-              const { startDate, endDate, startAgg, endAgg, delta, trendBrokers, sparkline } = trendResult;
+              const { startDate, endDate, startAgg, endAgg, delta, trendBrokers, sparkline, officeResults } = trendResult;
               const deltaColor  = delta > 0 ? "text-green-400" : delta < 0 ? "text-red-400" : (dark ? "text-gray-300" : "text-gray-600");
               const deltaArrow  = delta > 0 ? "↑" : delta < 0 ? "↓" : "→";
               const deltaBg     = delta > 0 ? (dark ? "bg-green-900" : "bg-green-50 border border-green-200")

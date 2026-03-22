@@ -216,6 +216,91 @@ function RecommendationRow({ deal, dark }) {
   );
 }
 
+/* ── Dumbbell chart – zdravie kancelárií ── */
+function OfficeTrendChart({ officeResults, dark }) {
+  const W     = 560;
+  const LEFT  = 46;   // šírka office labelu
+  const CEND  = 450;  // koniec chart oblasti
+  const TOP   = 8;
+  const ROW_H = 52;
+  const H     = TOP + officeResults.length * ROW_H + 30;
+  const xOf   = p => LEFT + (p / 100) * (CEND - LEFT);
+  const dim   = dark ? '#9ca3af' : '#9ca3af';
+  const grid  = dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)';
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block' }}>
+      {/* Vertikálne grid čiary */}
+      {[0, 25, 50, 75, 100].map(p => (
+        <line key={p}
+          x1={xOf(p)} y1={TOP} x2={xOf(p)} y2={H - 22}
+          stroke={p === 50 ? (dark ? '#4b5563' : '#cbd5e1') : grid}
+          strokeWidth={p === 50 ? 1.5 : 1}
+          strokeDasharray={p === 50 ? '5 3' : '3 3'} />
+      ))}
+
+      {officeResults.map((o, i) => {
+        const y  = TOP + i * ROW_H + ROW_H / 2;
+        const sp = o.startPct ?? 0;
+        const ep = o.endPct   ?? 0;
+        const xs = xOf(sp);
+        const xe = xOf(ep);
+        const pos = o.delta !== null && o.delta > 0;
+        const neg = o.delta !== null && o.delta < 0;
+        const lineCol  = pos ? '#22c55e' : neg ? '#ef4444' : '#6b7280';
+        const textCol  = pos ? (dark ? '#4ade80' : '#16a34a')
+                       : neg ? (dark ? '#f87171' : '#dc2626')
+                       : dim;
+        const dStr = o.delta === null ? '—' : o.delta > 0 ? `+${o.delta}%` : `${o.delta}%`;
+
+        return (
+          <g key={o.office}>
+            {/* Stredový pruh (každý druhý riadok) */}
+            {i % 2 === 0 && (
+              <rect x={LEFT - 2} y={y - ROW_H / 2 + 3} width={CEND - LEFT + 4} height={ROW_H - 6}
+                rx="4"
+                fill={dark ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.018)'} />
+            )}
+
+            {/* Kancelária label */}
+            <text x={LEFT - 8} y={y + 4}
+              textAnchor="end" fontSize="11" fontWeight="700"
+              fill={dark ? '#e5e7eb' : '#374151'}>{o.office}</text>
+
+            {/* Connecting line */}
+            {Math.abs(xe - xs) > 1 && (
+              <line x1={xs} y1={y} x2={xe} y2={y}
+                stroke={lineCol} strokeWidth="2.5" strokeLinecap="round" />
+            )}
+
+            {/* Počiatočný bod (dutý kruh = "bolo") */}
+            <circle cx={xs} cy={y} r="5"
+              fill={dark ? '#481132' : 'white'}
+              stroke={dark ? '#6b7280' : '#9ca3af'} strokeWidth="2" />
+
+            {/* Koncový bod (plný = "teraz") */}
+            <circle cx={xe} cy={y} r="7" fill={lineCol} />
+
+            {/* Delta % – hlavný label */}
+            <text x={CEND + 12} y={y - 3}
+              fontSize="12" fontWeight="800" fill={textCol}>{dStr}</text>
+
+            {/* "bolo → teraz" – vedľajší label */}
+            <text x={CEND + 12} y={y + 11}
+              fontSize="9.5" fill={dim}>{sp}%→{ep}%</text>
+          </g>
+        );
+      })}
+
+      {/* X-axis popisky */}
+      {[0, 25, 50, 75, 100].map(p => (
+        <text key={p} x={xOf(p)} y={H - 6}
+          textAnchor="middle" fontSize="9" fill={dim}>{p}%</text>
+      ))}
+    </svg>
+  );
+}
+
 const REFRESH_SEC = 180; // 3 minúty
 
 function computeBrokerHealth(deals) {
@@ -419,7 +504,26 @@ export default function DashboardClient() {
       const a = agg(byDate[date]);
       return { date, pct: a.pct };
     });
-    return { startDate, endDate, startAgg, endAgg, delta, trendBrokers, dates, sparkline };
+    // ── Per-office agregácia ──────────────────────────────────
+    const aggO = rows => {
+      const t = rows.reduce((s, r) => s + r.total, 0);
+      const k = rows.reduce((s, r) => s + r.cena_ok, 0);
+      return t > 0 ? Math.round((k / t) * 100) : null;
+    };
+    const officeResults = Object.entries(OFFICES)
+      .filter(([o]) => o !== 'Všetky')
+      .map(([officeName, officeMembers]) => {
+        const sr = byDate[startDate]?.filter(r => nameMatchesOffice(r.owner_name, officeMembers)) || [];
+        const er = byDate[endDate]  ?.filter(r => nameMatchesOffice(r.owner_name, officeMembers)) || [];
+        const sp = aggO(sr);
+        const ep = aggO(er);
+        const d  = sp !== null && ep !== null ? Math.round((ep - sp) * 10) / 10 : null;
+        return { office: officeName, startPct: sp, endPct: ep, delta: d };
+      })
+      .filter(o => o.endPct !== null)
+      .sort((a, b) => (b.delta ?? -999) - (a.delta ?? -999));
+
+    return { startDate, endDate, startAgg, endAgg, delta, trendBrokers, dates, sparkline, officeResults };
   }, [trendSnapshots, office]);
 
   return (
@@ -794,6 +898,41 @@ export default function DashboardClient() {
                       <p className={"text-xs " + (dark ? "text-gray-400" : "text-gray-500")}>{endAgg.ok} / {endAgg.total} dealov</p>
                     </div>
                   </div>
+
+                  {/* ── Graf kancelárií ───────────────────────────── */}
+                  {officeResults.length > 0 && (
+                    <div className={"rounded-xl p-4 mb-4 " + (dark ? "bg-[#3d0e2a]" : "bg-gray-50 border border-gray-100")}>
+                      {/* Hlavička grafu */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                        <p className={"text-sm font-semibold " + (dark ? "text-gray-200" : "text-gray-700")}>
+                          📊 Zdravie kancelárií
+                        </p>
+                        <p className={"text-xs font-medium px-2.5 py-1 rounded-full " + (dark ? "bg-gray-700 text-gray-300" : "bg-white border border-gray-200 text-gray-500")}>
+                          {startDate} → {endDate}
+                        </p>
+                      </div>
+
+                      {/* Legenda */}
+                      <div className={"flex gap-4 mb-3 text-xs " + (dark ? "text-gray-400" : "text-gray-500")}>
+                        <span className="flex items-center gap-1.5">
+                          <svg width="20" height="10">
+                            <circle cx="5" cy="5" r="4" fill="none" stroke={dark ? '#6b7280' : '#9ca3af'} strokeWidth="1.5" />
+                            <line x1="8" y1="5" x2="18" y2="5" stroke="#6b7280" strokeWidth="1.5" />
+                            <circle cx="18" cy="5" r="4" fill="#6b7280" />
+                          </svg>
+                          Začiatok obdobia → Teraz
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Rast
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> Pokles
+                        </span>
+                      </div>
+
+                      <OfficeTrendChart officeResults={officeResults} dark={dark} />
+                    </div>
+                  )}
 
                   {/* Sparkline */}
                   {sparkline.length > 2 && (

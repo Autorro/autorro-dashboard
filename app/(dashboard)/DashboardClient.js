@@ -108,6 +108,7 @@ function fmt(isoStr) {
 // Negative = below recommended (good)
 function getPriceDiff(selling, recommended) {
   if (!selling || !recommended || recommended === 0) return null;
+  if (recommended === 1) return 0; // placeholder hodnota = cena OK
   return Math.round(((selling - recommended) / recommended) * 100 * 10) / 10;
 }
 

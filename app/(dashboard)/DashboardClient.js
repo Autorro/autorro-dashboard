@@ -251,6 +251,9 @@ export default function DashboardClient() {
   const intervalRef       = useRef(null);
   const countdownRef      = useRef(null);
 
+  // ── Zobrazenie: 'zdravie' | 'trend' ─────────────────────────
+  const [view, setView] = useState('zdravie');
+
   // ── Trend zdravia ────────────────────────────────────────────
   const [trendPeriod,     setTrendPeriod]     = useState('week');
   const [trendCustomFrom, setTrendCustomFrom] = useState('');
@@ -451,6 +454,16 @@ export default function DashboardClient() {
               className={"px-4 py-2 rounded-full text-sm font-bold transition-all " + (partyMode ? "text-white animate-pulse" : btnBase)}
               style={partyMode ? { backgroundColor: "#FF501C" } : {}}>
               {partyMode ? "🎉 LIVE" : "🎉 Party Mode"}
+            </button>
+            <button
+              onClick={() => {
+                const next = view === 'zdravie' ? 'trend' : 'zdravie';
+                setView(next);
+                if (next === 'trend' && trendSnapshots === null) loadTrend(trendPeriod);
+              }}
+              className={"px-4 py-2 rounded-full text-sm font-medium transition-all " + (view === 'trend' ? "text-white" : btnBase)}
+              style={view === 'trend' ? { backgroundColor: "#FF501C" } : {}}>
+              📈 Trend
             </button>
             <button onClick={() => setDark(!dark)} className={"px-4 py-2 rounded-full text-sm font-medium " + btnBase}>
               {dark ? "☀️" : "🌙"}
@@ -676,6 +689,7 @@ export default function DashboardClient() {
           </div>
 
           {/* ── Trend zdravia ponuky ─────────────────────────────── */}
+          {view === 'trend' && (
           <div className={"rounded-xl p-4 mb-6 " + cardCls} style={cardStyle}>
             <h2 className="font-semibold mb-3">📈 Trend zdravia ponuky</h2>
 
@@ -851,7 +865,10 @@ export default function DashboardClient() {
               );
             })()}
           </div>
+          )}
 
+          {/* ── Zdravie ponuky obsah ─────────────────────────────── */}
+          {view === 'zdravie' && <>
           {/* Top 5 značiek */}
           <div className={"rounded-xl p-4 mb-6 " + cardCls} style={cardStyle}>
             <div className="flex justify-between items-center mb-3">
@@ -1079,6 +1096,7 @@ export default function DashboardClient() {
                 })}
               </tbody>
             </table>
+          </>}
         </>}
       </div>
     </div>

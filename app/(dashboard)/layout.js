@@ -6,7 +6,6 @@ import { useState } from "react";
 const NAV_ITEMS = [
   { href: "/",                icon: "🏆", label: "Leaderboard predaja" },
   { href: "/zdravie-ponuky",  icon: "🏥", label: "Zdravie ponuky" },
-  { href: "/trend",           icon: "📈", label: "Trend zdravia" },
   { href: "/reakčný-čas",    icon: "⚡", label: "Reakčný čas" },
   { href: "/cas-predaja",     icon: "🕐", label: "Čas predaja" },
   { href: "/znacky",          icon: "🚘", label: "Značky vozidiel" },

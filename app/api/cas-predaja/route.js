@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase-server'
 import { createCache } from '@/lib/pipedrive'
 import { INZEROVANE_STAGES } from '@/lib/constants'
 

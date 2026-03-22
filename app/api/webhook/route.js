@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase-server'
 
 const PIPEDRIVE_TOKEN = process.env.PIPEDRIVE_API_TOKEN
 

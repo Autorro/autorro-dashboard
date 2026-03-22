@@ -1,4 +1,4 @@
-import { supabase }                    from '@/lib/supabase'
+import { supabase }                    from '@/lib/supabase-server'
 import { fetchAllPages }               from '@/lib/pipedrive'
 import { INZEROVANE_STAGES, EXCLUDE, CENA_KEY } from '@/lib/constants'
 

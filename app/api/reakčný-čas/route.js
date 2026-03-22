@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase-server'
 import { createCache } from '@/lib/pipedrive'
 
 const CACHE_TTL = 5 * 60 * 1000

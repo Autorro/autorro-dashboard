@@ -254,6 +254,13 @@ export default function DashboardClient() {
   const intervalRef       = useRef(null);
   const countdownRef      = useRef(null);
 
+  // ── Trend zdravia ────────────────────────────────────────────
+  const [trendPeriod,     setTrendPeriod]     = useState('week');
+  const [trendCustomFrom, setTrendCustomFrom] = useState('');
+  const [trendCustomTo,   setTrendCustomTo]   = useState('');
+  const [trendSnapshots,  setTrendSnapshots]  = useState(null); // null = ešte nenačítané
+  const [trendLoading,    setTrendLoading]    = useState(false);
+
   function loadDeals(force = false) {
     setRefreshing(true);
     fetch("/api/zdravie-ponuky" + (force ? "?force=1" : ""))
@@ -281,6 +288,27 @@ export default function DashboardClient() {
       .catch(() => { setLoading(false); setRefreshing(false); });
   }
 
+  function daysAgo(n) {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    return d.toISOString().split('T')[0];
+  }
+
+  function loadTrend(period, customFrom, customTo) {
+    const today = new Date().toISOString().split('T')[0];
+    let from, to = today;
+    if (period === 'week')        from = daysAgo(7);
+    else if (period === 'month')  from = daysAgo(30);
+    else if (period === 'year')   from = new Date().getFullYear() + '-01-01';
+    else if (period === 'custom') { from = customFrom; to = customTo || today; }
+    if (!from) return;
+    setTrendLoading(true);
+    fetch(`/api/trend-zdravia?from=${from}&to=${to}`)
+      .then(r => r.json())
+      .then(res => { setTrendSnapshots(res.snapshots || []); setTrendLoading(false); })
+      .catch(() => setTrendLoading(false));
+  }
+
   useEffect(() => { loadDeals(false); }, []);
 
   useEffect(() => {
@@ -294,6 +322,10 @@ export default function DashboardClient() {
     countdownRef.current = setInterval(() => setCountdown(c => c > 0 ? c - 1 : 0), 1000);
     return () => { clearInterval(intervalRef.current); clearInterval(countdownRef.current); };
   }, [partyMode]);
+
+  useEffect(() => {
+    if (trendPeriod !== 'custom') loadTrend(trendPeriod);
+  }, [trendPeriod]);
 
   function toggleExpand(name) { setExpanded(e => ({ ...e, [name]: !e[name] })); }
 
@@ -348,6 +380,49 @@ export default function DashboardClient() {
     const pct   = od.length > 0 ? Math.round((ok / od.length) * 100) : 0;
     return { name: o, total: od.length, ok, pct };
   }).sort((a, b) => b.pct - a.pct);
+
+  // ── Výpočet trendu (závisí od office filtra, recomputuje sa pri každom renderi) ──
+  const officeNamesForTrend = office === "Všetky" ? null : (OFFICES[office] || []);
+  let trendResult = null;
+  if (trendSnapshots && trendSnapshots.length > 0) {
+    const byDate = {};
+    trendSnapshots.forEach(r => {
+      if (!byDate[r.snapshot_date]) byDate[r.snapshot_date] = [];
+      byDate[r.snapshot_date].push(r);
+    });
+    const dates = Object.keys(byDate).sort();
+    if (dates.length >= 2) {
+      const startDate = dates[0];
+      const endDate   = dates[dates.length - 1];
+      const agg = rows => {
+        const f = officeNamesForTrend
+          ? rows.filter(r => nameMatchesOffice(r.owner_name, officeNamesForTrend))
+          : rows;
+        const t = f.reduce((s, r) => s + r.total, 0);
+        const k = f.reduce((s, r) => s + r.cena_ok, 0);
+        return { total: t, ok: k, pct: t > 0 ? Math.round((k / t) * 100) : 0 };
+      };
+      const startAgg = agg(byDate[startDate]);
+      const endAgg   = agg(byDate[endDate]);
+      const delta    = endAgg.pct - startAgg.pct;
+      const allNames = [...new Set(trendSnapshots.map(r => r.owner_name))]
+        .filter(n => !officeNamesForTrend || nameMatchesOffice(n, officeNamesForTrend));
+      const trendBrokers = allNames.map(name => {
+        const s = byDate[startDate]?.find(r => r.owner_name === name);
+        const e = byDate[endDate]?.find(r => r.owner_name === name);
+        const d = (s && e) ? Math.round((e.health_pct - s.health_pct) * 10) / 10 : null;
+        return { name, startPct: s?.health_pct ?? null, endPct: e?.health_pct ?? null, delta: d };
+      }).filter(b => b.endPct !== null).sort((a, b) => (b.delta ?? 0) - (a.delta ?? 0));
+      // Sparkline: overall pct per date
+      const sparkline = dates.map(date => {
+        const a = agg(byDate[date]);
+        return { date, pct: a.pct };
+      });
+      trendResult = { startDate, endDate, startAgg, endAgg, delta, trendBrokers, dates, sparkline };
+    } else if (dates.length === 1) {
+      trendResult = { singleDate: dates[0] };
+    }
+  }
 
   return (
     <div className={"min-h-screen " + bg} style={bgStyle}>
@@ -597,6 +672,175 @@ export default function DashboardClient() {
               <p className={"text-sm " + (dark ? "text-gray-400" : "text-gray-500")}>Zdravie ponuky</p>
               <p className={"text-2xl font-bold " + health.color}>{totalPct}% – {health.label}</p>
             </div>
+          </div>
+
+          {/* ── Trend zdravia ponuky ─────────────────────────────── */}
+          <div className={"rounded-xl p-4 mb-6 " + cardCls} style={cardStyle}>
+            <h2 className="font-semibold mb-3">📈 Trend zdravia ponuky</h2>
+
+            {/* Period selector */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              {[
+                { key: 'week',   label: 'Posledný týždeň' },
+                { key: 'month',  label: 'Posledný mesiac' },
+                { key: 'year',   label: 'Tento rok' },
+                { key: 'custom', label: '📅 Vlastné obdobie' },
+              ].map(p => (
+                <button key={p.key} onClick={() => setTrendPeriod(p.key)}
+                  className={"px-3 py-1.5 rounded-full text-sm font-medium transition-all " + (trendPeriod === p.key ? "text-white" : btnBase)}
+                  style={trendPeriod === p.key ? { backgroundColor: "#FF501C" } : {}}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom date range */}
+            {trendPeriod === 'custom' && (
+              <div className="flex flex-wrap items-center gap-2 mb-4">
+                <input type="date" value={trendCustomFrom}
+                  onChange={e => setTrendCustomFrom(e.target.value)}
+                  className={"rounded-lg border px-3 py-1.5 text-sm " + (dark ? "bg-gray-800 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900")} />
+                <span className={dark ? "text-gray-400" : "text-gray-500"}>—</span>
+                <input type="date" value={trendCustomTo}
+                  onChange={e => setTrendCustomTo(e.target.value)}
+                  className={"rounded-lg border px-3 py-1.5 text-sm " + (dark ? "bg-gray-800 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900")} />
+                <button
+                  onClick={() => loadTrend('custom', trendCustomFrom, trendCustomTo)}
+                  disabled={!trendCustomFrom}
+                  className="px-4 py-1.5 rounded-full text-sm font-medium text-white disabled:opacity-40"
+                  style={{ backgroundColor: "#FF501C" }}>
+                  Zobraz
+                </button>
+              </div>
+            )}
+
+            {/* Loading state */}
+            {trendLoading && (
+              <div className="flex items-center gap-2 py-4 text-sm" style={{ color: "#FF501C" }}>
+                <span className="animate-spin">⟳</span> Načítavam dáta…
+              </div>
+            )}
+
+            {/* No data yet */}
+            {!trendLoading && trendSnapshots !== null && trendSnapshots.length === 0 && (
+              <div className={"rounded-lg p-4 text-sm text-center " + (dark ? "bg-gray-800 text-gray-400" : "bg-gray-50 text-gray-500")}>
+                <p className="text-2xl mb-2">📭</p>
+                <p className="font-medium mb-1">Zatiaľ žiadne historické dáta</p>
+                <p>Snapshotový cron beží každý deň o 22:00 UTC.<br />Trend bude dostupný od zajtra.</p>
+              </div>
+            )}
+
+            {/* Not enough data (only 1 snapshot) */}
+            {!trendLoading && trendSnapshots !== null && trendResult?.singleDate && (
+              <div className={"rounded-lg p-4 text-sm text-center " + (dark ? "bg-gray-800 text-gray-400" : "bg-gray-50 text-gray-500")}>
+                <p className="text-2xl mb-2">📊</p>
+                <p className="font-medium mb-1">Nedostatok dát na porovnanie</p>
+                <p>Máme snapshot z <strong>{trendResult.singleDate}</strong>.<br />Potrebujeme aspoň 2 snapshotové dni pre zobrazenie trendu.</p>
+              </div>
+            )}
+
+            {/* Trend result */}
+            {!trendLoading && trendResult && !trendResult.singleDate && (() => {
+              const { startDate, endDate, startAgg, endAgg, delta, trendBrokers, sparkline } = trendResult;
+              const deltaColor  = delta > 0 ? "text-green-400" : delta < 0 ? "text-red-400" : (dark ? "text-gray-300" : "text-gray-600");
+              const deltaArrow  = delta > 0 ? "↑" : delta < 0 ? "↓" : "→";
+              const deltaBg     = delta > 0 ? (dark ? "bg-green-900" : "bg-green-50 border border-green-200")
+                                : delta < 0 ? (dark ? "bg-red-900"   : "bg-red-50 border border-red-200")
+                                :              (dark ? "bg-gray-700"  : "bg-gray-50 border border-gray-200");
+              const maxPct      = Math.max(...sparkline.map(p => p.pct), 1);
+
+              return (
+                <>
+                  {/* Overall delta banner */}
+                  <div className={"rounded-xl p-4 mb-4 flex flex-wrap items-center justify-between gap-4 " + deltaBg}>
+                    <div>
+                      <p className={"text-xs font-semibold uppercase tracking-wider mb-0.5 " + (dark ? "text-gray-400" : "text-gray-500")}>
+                        Zmena zdravia ponuky
+                      </p>
+                      <p className={"text-4xl font-extrabold " + deltaColor}>
+                        {delta > 0 ? "+" : ""}{delta}% {deltaArrow}
+                      </p>
+                      <p className={"text-xs mt-1 " + (dark ? "text-gray-400" : "text-gray-500")}>
+                        {startDate} → {endDate}
+                        {office !== "Všetky" && <span className="ml-2 font-semibold">📍 {office}</span>}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className={"text-sm font-bold " + deltaColor}>{endAgg.pct}% teraz</p>
+                      <p className={"text-xs " + (dark ? "text-gray-400" : "text-gray-500")}>bolo {startAgg.pct}%</p>
+                      <p className={"text-xs " + (dark ? "text-gray-400" : "text-gray-500")}>{endAgg.ok} / {endAgg.total} dealov</p>
+                    </div>
+                  </div>
+
+                  {/* Sparkline */}
+                  {sparkline.length > 2 && (
+                    <div className="mb-4">
+                      <p className={"text-xs font-medium mb-1 " + (dark ? "text-gray-400" : "text-gray-500")}>
+                        Vývoj zdravia v období ({sparkline.length} dní so snapshotom)
+                      </p>
+                      <div className="flex items-end gap-0.5 h-12 w-full">
+                        {sparkline.map((p, i) => {
+                          const barH = Math.max(4, Math.round((p.pct / maxPct) * 48));
+                          const col  = p.pct >= 50 ? "#22c55e" : p.pct >= 35 ? "#eab308" : "#ef4444";
+                          return (
+                            <div key={i} title={`${p.date}: ${p.pct}%`}
+                              className="flex-1 rounded-sm transition-all cursor-default"
+                              style={{ height: barH + "px", backgroundColor: col, opacity: 0.7 + (i / sparkline.length) * 0.3 }} />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Per-broker table */}
+                  {trendBrokers.length > 0 && (
+                    <div>
+                      <p className={"text-xs font-medium mb-2 " + (dark ? "text-gray-400" : "text-gray-500")}>
+                        Zmena zdravia podľa makléra
+                      </p>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className={"text-xs font-semibold uppercase tracking-wider " + (dark ? "text-gray-400" : "text-gray-500")}
+                              style={theadStyle}>
+                              <th className="p-2 text-left">Maklér</th>
+                              <th className="p-2 text-right hidden md:table-cell">Začiatok</th>
+                              <th className="p-2 text-right">Teraz</th>
+                              <th className="p-2 text-right">Zmena</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {trendBrokers.map(b => {
+                              const dc = b.delta === null ? (dark ? "text-gray-500" : "text-gray-400")
+                                       : b.delta > 0  ? "text-green-400"
+                                       : b.delta < 0  ? "text-red-400"
+                                       :                (dark ? "text-gray-300" : "text-gray-600");
+                              const da = b.delta === null ? "—"
+                                       : b.delta > 0  ? `+${b.delta}% ↑`
+                                       : b.delta < 0  ? `${b.delta}% ↓`
+                                       :                "0% →";
+                              const endH  = getHealth(b.endPct);
+                              return (
+                                <tr key={b.name} className={"border-t " + rowCls}>
+                                  <td className="p-2 font-medium">{b.name}</td>
+                                  <td className={"p-2 text-right hidden md:table-cell " + (dark ? "text-gray-400" : "text-gray-500")}>
+                                    {b.startPct !== null ? b.startPct + "%" : "—"}
+                                  </td>
+                                  <td className={"p-2 text-right font-semibold " + endH.color}>
+                                    {b.endPct !== null ? b.endPct + "%" : "—"}
+                                  </td>
+                                  <td className={"p-2 text-right font-bold " + dc}>{da}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           {/* Top 5 značiek */}

@@ -259,11 +259,11 @@ export default function SalesLeaderboardClient() {
       </div>
 
       {/* ── Filtre ── */}
-      <div className="bg-white rounded-2xl shadow-sm px-4 py-3 overflow-x-auto">
-        <div className="flex items-center gap-3 min-w-max">
+      <div className="bg-white rounded-2xl shadow-sm px-4 py-3">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
 
           {/* Kancelária */}
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Kancelária</span>
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mr-1">Kancelária</span>
           {Object.keys(OFFICES).map(o=>(
             <button key={o} onClick={()=>setOffice(o)}
               className="px-3 py-1 rounded-full text-sm font-semibold transition-all whitespace-nowrap"
@@ -272,10 +272,10 @@ export default function SalesLeaderboardClient() {
           ))}
 
           {/* Divider */}
-          <div className="h-6 w-px bg-gray-200 mx-1 flex-shrink-0"/>
+          <div className="h-5 w-px bg-gray-200 mx-2 self-center flex-shrink-0"/>
 
           {/* Obdobie */}
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Obdobie</span>
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mr-1">Obdobie</span>
           {PERIODS.map(p=>(
             <button key={p} onClick={()=>setPeriod(p)}
               className="px-3 py-1 rounded-full text-sm font-semibold transition-all whitespace-nowrap"

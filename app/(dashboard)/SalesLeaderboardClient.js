@@ -261,40 +261,49 @@ export default function SalesLeaderboardClient() {
       )}
 
       {/* ── Filtre ── */}
-      <div className="bg-white rounded-2xl shadow-sm p-4 flex flex-wrap gap-4 items-end">
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Kancelária</label>
-          <div className="flex flex-wrap gap-1.5">
-            {Object.keys(OFFICES).map(o=>(
-              <button key={o} onClick={()=>setOffice(o)}
-                className="px-3 py-1 rounded-full text-sm font-semibold transition-all"
-                style={office===o?{backgroundColor:ACCENT,color:"white",boxShadow:"0 2px 8px #FF501C55"}:{backgroundColor:"#f3f4f6",color:"#6b7280"}}
-              >{o}</button>
-            ))}
+      <div className="bg-white rounded-2xl shadow-sm px-4 pt-3 pb-3">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+
+          {/* Kancelária */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Kancelária</span>
+            <div className="flex flex-wrap gap-1.5">
+              {Object.keys(OFFICES).map(o=>(
+                <button key={o} onClick={()=>setOffice(o)}
+                  className="px-3 py-1 rounded-full text-sm font-semibold transition-all"
+                  style={office===o?{backgroundColor:ACCENT,color:"white",boxShadow:"0 2px 8px #FF501C55"}:{backgroundColor:"#f3f4f6",color:"#6b7280"}}
+                >{o}</button>
+              ))}
+            </div>
           </div>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Obdobie</label>
-          <div className="flex flex-wrap gap-1.5">
-            {PERIODS.map(p=>(
-              <button key={p} onClick={()=>setPeriod(p)}
-                className="px-3 py-1 rounded-full text-sm font-semibold transition-all"
-                style={period===p?{backgroundColor:"#1e3a5f",color:"white",boxShadow:"0 2px 8px #1e3a5f55"}:{backgroundColor:"#f3f4f6",color:"#6b7280"}}
-              >{p}</button>
-            ))}
-          </div>
-        </div>
-        {period==="Vlastné"&&(
+
+          {/* Divider */}
+          <div className="hidden sm:block h-6 w-px bg-gray-200 flex-shrink-0"/>
+
+          {/* Obdobie */}
           <div className="flex items-center gap-2 flex-wrap">
-            {[{label:"Od",val:from,set:setFrom},{label:"Do",val:to,set:setTo}].map(f=>(
-              <div key={f.label} className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-400">{f.label}</label>
-                <input type="date" value={f.val} onChange={e=>f.set(e.target.value)}
-                  className="border border-gray-200 rounded-xl px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200"/>
-              </div>
-            ))}
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Obdobie</span>
+            <div className="flex flex-wrap gap-1.5">
+              {PERIODS.map(p=>(
+                <button key={p} onClick={()=>setPeriod(p)}
+                  className="px-3 py-1 rounded-full text-sm font-semibold transition-all"
+                  style={period===p?{backgroundColor:"#1e3a5f",color:"white",boxShadow:"0 2px 8px #1e3a5f55"}:{backgroundColor:"#f3f4f6",color:"#6b7280"}}
+                >{p}</button>
+              ))}
+            </div>
+            {/* Vlastné – inline, bez skoku */}
+            <div className={`flex items-center gap-2 overflow-hidden transition-all duration-200 ${period==="Vlastné" ? "max-w-xs opacity-100" : "max-w-0 opacity-0 pointer-events-none"}`}>
+              {[{label:"Od",val:from,set:setFrom},{label:"Do",val:to,set:setTo}].map(f=>(
+                <div key={f.label} className="flex items-center gap-1">
+                  <span className="text-xs font-semibold text-gray-400">{f.label}</span>
+                  <input type="date" value={f.val} onChange={e=>f.set(e.target.value)}
+                    className="border border-gray-200 rounded-xl px-2 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200"/>
+                </div>
+              ))}
+            </div>
           </div>
-        )}
+
+        </div>
       </div>
 
       {/* ── Legenda pozícií ── */}

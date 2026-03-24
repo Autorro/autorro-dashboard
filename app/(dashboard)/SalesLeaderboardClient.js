@@ -77,6 +77,12 @@ function thisMonthRange() {
   const now=new Date(), y=now.getFullYear(), m=now.getMonth();
   return {from:new Date(y,m,1), to:new Date(y,m+1,0)};
 }
+function getMonthProgress() {
+  const now=new Date(), y=now.getFullYear(), m=now.getMonth();
+  const elapsed = now.getDate();
+  const total   = new Date(y,m+1,0).getDate();
+  return { elapsed, total, pct: elapsed/total };
+}
 
 const PERIODS = ["Tento mesiac","Minulý mesiac","Posledné 3 mesiace","Tento rok","Vlastné"];
 const MEDALS  = ["🥇","🥈","🥉"];
@@ -159,6 +165,11 @@ export default function SalesLeaderboardClient() {
     .filter((_,i)=>!EXCLUDE.some(e=>norm(e)===norm(Object.keys(thisMonthByBroker)[i])))
     .reduce((s,v)=>s+v,0);
 
+  const monthProgress  = getMonthProgress();
+  const isThisMonth    = period === "Tento mesiac";
+  const showForecast   = isThisMonth && monthProgress.elapsed < monthProgress.total && monthProgress.pct > 0;
+  const totalForecast  = showForecast ? totalThisMonth / monthProgress.pct : 0;
+
   /* ── Financovanie – celkové sumy za obdobie ── */
   const totalUverProviziaSum = brokers.reduce((s,b)=>s+b.totalUver,0);
   const totalUverEarned      = brokers.reduce((s,b)=>{
@@ -194,16 +205,25 @@ export default function SalesLeaderboardClient() {
       </div>
 
       {/* ── Súhrnné karty ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className={`grid gap-3 ${showForecast ? "grid-cols-2 md:grid-cols-5" : "grid-cols-2 md:grid-cols-4"}`}>
         {[
           {label:"Predané (obdobie)", value:totalDeals,     fmt:v=>v+" ks",  icon:"🚗", grad:"from-blue-600 to-blue-700"},
           {label:"Obrat (obdobie)",   value:totalRevenue,   fmt:fmtEur,       icon:"💰", grad:"from-green-600 to-green-700"},
           {label:"Priemerný deal",    value:avgPerDeal,     fmt:fmtEur,       icon:"📊", grad:"from-purple-600 to-purple-700"},
           {label:"Obrat tento mesiac",value:totalThisMonth, fmt:fmtEur,       icon:"📅", grad:"from-orange-500 to-red-500"},
+          ...(showForecast ? [{
+            label:`Prognóza (${monthProgress.elapsed}/${monthProgress.total} dní)`,
+            value:totalForecast,
+            fmt:fmtEur,
+            icon:"📈",
+            grad:"from-teal-500 to-cyan-600",
+            sub: `${Math.round(monthProgress.pct*100)}% mesiaca`,
+          }] : []),
         ].map(s=>(
           <div key={s.label} className={`rounded-2xl p-4 text-white bg-gradient-to-br ${s.grad} shadow-sm`}>
             <p className="text-xs font-semibold text-white/70 uppercase tracking-wider mb-1">{s.icon} {s.label}</p>
             <p className="text-xl font-extrabold leading-tight">{s.fmt(s.value)}</p>
+            {s.sub && <p className="text-xs text-white/60 mt-0.5">{s.sub}</p>}
           </div>
         ))}
       </div>
@@ -320,6 +340,9 @@ export default function SalesLeaderboardClient() {
             const hasUverInPeriod = b.totalUver > 0;
             const hasUverDeals    = b.deals.some(d=>(d.proviziaUver||0)>0);
 
+            const brokerForecast      = showForecast && b.thisMonth > 0 ? b.thisMonth / monthProgress.pct : null;
+            const brokerForecastEarned= brokerForecast ? brokerForecast * (tier.hotovostna/100) : null;
+
             const ac    = avatarColor(b.name);
             const isTop3= i<3;
 
@@ -357,6 +380,11 @@ export default function SalesLeaderboardClient() {
                       {earnedMonthTotal>0&&(
                         <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
                           📅 {fmtEur(earnedMonthTotal)} tento mes.
+                        </span>
+                      )}
+                      {brokerForecastEarned&&(
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-teal-50 text-teal-700 border border-teal-200 whitespace-nowrap">
+                          📈 {fmtEur(brokerForecastEarned)} prognóza
                         </span>
                       )}
                     </div>
@@ -423,6 +451,30 @@ export default function SalesLeaderboardClient() {
                           <p className="text-xs text-gray-500 mb-0.5">Predané (obdobie)</p>
                           <span className="font-extrabold text-base text-gray-900">{b.count} aut</span>
                         </div>
+                        {brokerForecast && (
+                          <div className="col-span-2 sm:col-span-4 rounded-xl px-4 py-3 bg-teal-50 border border-teal-200">
+                            <p className="text-xs text-teal-600 font-semibold uppercase tracking-wider mb-2">
+                              📈 Prognóza konca mesiaca · {monthProgress.elapsed}/{monthProgress.total} dní ({Math.round(monthProgress.pct*100)}%)
+                            </p>
+                            <div className="grid grid-cols-3 gap-4">
+                              <div>
+                                <p className="text-xs text-gray-500 mb-0.5">Predpokladaný obrat</p>
+                                <p className="font-extrabold text-base text-teal-800">{fmtEur(brokerForecast)}</p>
+                                <p className="text-xs text-gray-400 mt-0.5">doteraz {fmtEur(b.thisMonth)}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-gray-500 mb-0.5">Predpokladané zárobky</p>
+                                <p className="font-extrabold text-base text-teal-800">{fmtEur(brokerForecastEarned)}</p>
+                                <p className="text-xs text-gray-400 mt-0.5">{tier.hotovostna}% z obratu</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-gray-500 mb-0.5">Zostatok mesiaca</p>
+                                <p className="font-extrabold text-base text-gray-700">{fmtEur(brokerForecast - b.thisMonth)}</p>
+                                <p className="text-xs text-gray-400 mt-0.5">{monthProgress.total - monthProgress.elapsed} dní</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         {next&&(
                           <div className="col-span-2 sm:col-span-4">
                             <p className="text-xs text-gray-500 mb-1">Postup na {next.id} — chýba {fmtEur(remaining)}</p>

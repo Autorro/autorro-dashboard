@@ -64,8 +64,9 @@ function fmtDate(d) {
 
 /* ── Prednastavené obdobia ── */
 function getRange(period) {
-  const now=new Date(), y=now.getFullYear(), m=now.getMonth();
+  const now=new Date(), y=now.getFullYear(), m=now.getMonth(), d=now.getDate();
   switch(period){
+    case "Dnes":               return {from:new Date(y,m,d),   to:new Date(y,m,d,23,59,59)};
     case "Tento mesiac":       return {from:new Date(y,m,1),   to:new Date(y,m+1,0)};
     case "Minulý mesiac":      return {from:new Date(y,m-1,1), to:new Date(y,m,0)};
     case "Posledné 3 mesiace": return {from:new Date(y,m-2,1), to:new Date(y,m+1,0)};
@@ -84,7 +85,7 @@ function getMonthProgress() {
   return { elapsed, total, pct: elapsed/total };
 }
 
-const PERIODS = ["Tento mesiac","Minulý mesiac","Posledné 3 mesiace","Tento rok","Vlastné"];
+const PERIODS = ["Dnes","Tento mesiac","Minulý mesiac","Posledné 3 mesiace","Tento rok","Vlastné"];
 const MEDALS  = ["🥇","🥈","🥉"];
 const ACCENT  = "#FF501C";
 

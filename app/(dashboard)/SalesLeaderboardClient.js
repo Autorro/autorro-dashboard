@@ -229,78 +229,69 @@ export default function SalesLeaderboardClient() {
         ))}
       </div>
 
-      {/* ── Banner: Financovanie (zobrazí sa iba ak sú dáta) ── */}
-      {totalUverProviziaSum > 0 && (
-        <div className="rounded-2xl p-5 text-white shadow-sm"
-          style={{background:"linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 60%, #2563eb 100%)"}}>
-          <p className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-3">
-            💳 Príjmy z financovania – {period === "Vlastné" ? "vlastné obdobie" : period.toLowerCase()}
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white/10 rounded-xl px-4 py-3">
-              <p className="text-xs text-white/60 mb-0.5">Celkové provízie z financovania</p>
-              <p className="text-2xl font-extrabold">{fmtEur(totalUverProviziaSum)}</p>
-              <p className="text-xs text-white/50 mt-0.5">{countUverDeals} dealov s financovaním</p>
-            </div>
-            <div className="bg-white/10 rounded-xl px-4 py-3">
-              <p className="text-xs text-white/60 mb-0.5">Zárobky maklérov z financovania</p>
-              <p className="text-2xl font-extrabold">{fmtEur(totalUverEarned)}</p>
-              <p className="text-xs text-white/50 mt-0.5">podľa kariérnych % (20–25 %)</p>
-            </div>
-            <div className="bg-white/10 rounded-xl px-4 py-3">
-              <p className="text-xs text-white/60 mb-0.5">Zostatok po vyplatení maklérov</p>
-              <p className="text-2xl font-extrabold">{fmtEur(totalUverProviziaSum - totalUverEarned)}</p>
-              <p className="text-xs text-white/50 mt-0.5">
-                {totalUverProviziaSum > 0
-                  ? `${Math.round(((totalUverProviziaSum - totalUverEarned) / totalUverProviziaSum) * 100)} % z celkového objemu`
-                  : '—'}
-              </p>
-            </div>
+      {/* ── Banner: Financovanie (vždy zobrazený) ── */}
+      <div className="rounded-2xl p-5 text-white shadow-sm"
+        style={{background:"linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 60%, #2563eb 100%)"}}>
+        <p className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-3">
+          💳 Príjmy z financovania – {period === "Vlastné" ? "vlastné obdobie" : period.toLowerCase()}
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-white/10 rounded-xl px-4 py-3">
+            <p className="text-xs text-white/60 mb-0.5">Celkové provízie z financovania</p>
+            <p className="text-2xl font-extrabold">{fmtEur(totalUverProviziaSum)}</p>
+            <p className="text-xs text-white/50 mt-0.5">{countUverDeals} dealov s financovaním</p>
+          </div>
+          <div className="bg-white/10 rounded-xl px-4 py-3">
+            <p className="text-xs text-white/60 mb-0.5">Zárobky maklérov z financovania</p>
+            <p className="text-2xl font-extrabold">{fmtEur(totalUverEarned)}</p>
+            <p className="text-xs text-white/50 mt-0.5">podľa kariérnych % (20–25 %)</p>
+          </div>
+          <div className="bg-white/10 rounded-xl px-4 py-3">
+            <p className="text-xs text-white/60 mb-0.5">Zostatok po vyplatení maklérov</p>
+            <p className="text-2xl font-extrabold">{fmtEur(totalUverProviziaSum - totalUverEarned)}</p>
+            <p className="text-xs text-white/50 mt-0.5">
+              {totalUverProviziaSum > 0
+                ? `${Math.round(((totalUverProviziaSum - totalUverEarned) / totalUverProviziaSum) * 100)} % z celkového objemu`
+                : 'žiadne financovanie v tomto období'}
+            </p>
           </div>
         </div>
-      )}
+      </div>
 
       {/* ── Filtre ── */}
-      <div className="bg-white rounded-2xl shadow-sm px-4 pt-3 pb-3">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+      <div className="bg-white rounded-2xl shadow-sm px-4 py-3 overflow-x-auto">
+        <div className="flex items-center gap-3 min-w-max">
 
           {/* Kancelária */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Kancelária</span>
-            <div className="flex flex-wrap gap-1.5">
-              {Object.keys(OFFICES).map(o=>(
-                <button key={o} onClick={()=>setOffice(o)}
-                  className="px-3 py-1 rounded-full text-sm font-semibold transition-all"
-                  style={office===o?{backgroundColor:ACCENT,color:"white",boxShadow:"0 2px 8px #FF501C55"}:{backgroundColor:"#f3f4f6",color:"#6b7280"}}
-                >{o}</button>
-              ))}
-            </div>
-          </div>
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Kancelária</span>
+          {Object.keys(OFFICES).map(o=>(
+            <button key={o} onClick={()=>setOffice(o)}
+              className="px-3 py-1 rounded-full text-sm font-semibold transition-all whitespace-nowrap"
+              style={office===o?{backgroundColor:ACCENT,color:"white",boxShadow:"0 2px 8px #FF501C55"}:{backgroundColor:"#f3f4f6",color:"#6b7280"}}
+            >{o}</button>
+          ))}
 
           {/* Divider */}
-          <div className="hidden sm:block h-6 w-px bg-gray-200 flex-shrink-0"/>
+          <div className="h-6 w-px bg-gray-200 mx-1 flex-shrink-0"/>
 
           {/* Obdobie */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Obdobie</span>
-            <div className="flex flex-wrap gap-1.5">
-              {PERIODS.map(p=>(
-                <button key={p} onClick={()=>setPeriod(p)}
-                  className="px-3 py-1 rounded-full text-sm font-semibold transition-all"
-                  style={period===p?{backgroundColor:"#1e3a5f",color:"white",boxShadow:"0 2px 8px #1e3a5f55"}:{backgroundColor:"#f3f4f6",color:"#6b7280"}}
-                >{p}</button>
-              ))}
-            </div>
-            {/* Vlastné – inline, bez skoku */}
-            <div className={`flex items-center gap-2 overflow-hidden transition-all duration-200 ${period==="Vlastné" ? "max-w-xs opacity-100" : "max-w-0 opacity-0 pointer-events-none"}`}>
-              {[{label:"Od",val:from,set:setFrom},{label:"Do",val:to,set:setTo}].map(f=>(
-                <div key={f.label} className="flex items-center gap-1">
-                  <span className="text-xs font-semibold text-gray-400">{f.label}</span>
-                  <input type="date" value={f.val} onChange={e=>f.set(e.target.value)}
-                    className="border border-gray-200 rounded-xl px-2 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200"/>
-                </div>
-              ))}
-            </div>
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Obdobie</span>
+          {PERIODS.map(p=>(
+            <button key={p} onClick={()=>setPeriod(p)}
+              className="px-3 py-1 rounded-full text-sm font-semibold transition-all whitespace-nowrap"
+              style={period===p?{backgroundColor:"#1e3a5f",color:"white",boxShadow:"0 2px 8px #1e3a5f55"}:{backgroundColor:"#f3f4f6",color:"#6b7280"}}
+            >{p}</button>
+          ))}
+
+          {/* Vlastné – inline, bez skoku */}
+          <div className={`flex items-center gap-2 overflow-hidden transition-all duration-200 ${period==="Vlastné" ? "max-w-xs opacity-100" : "max-w-0 opacity-0 pointer-events-none"}`}>
+            {[{label:"Od",val:from,set:setFrom},{label:"Do",val:to,set:setTo}].map(f=>(
+              <div key={f.label} className="flex items-center gap-1">
+                <span className="text-xs font-semibold text-gray-400">{f.label}</span>
+                <input type="date" value={f.val} onChange={e=>f.set(e.target.value)}
+                  className="border border-gray-200 rounded-xl px-2 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200"/>
+              </div>
+            ))}
           </div>
 
         </div>

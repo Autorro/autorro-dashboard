@@ -9,8 +9,9 @@ const NAV_ITEMS = [
   { href: "/reakčný-čas",    icon: "⚡", label: "Reakčný čas" },
   { href: "/cas-predaja",     icon: "🕐", label: "Čas predaja" },
   { href: "/znacky",          icon: "🚘", label: "Značky vozidiel" },
-  { href: "/konverzia",       icon: "🎯", label: "Konverzia leadov" },
-  { href: "/users",           icon: "👥", label: "Používatelia" },
+  { href: "/konverzia",                icon: "🎯", label: "Konverzia leadov" },
+  { href: "/vyhodnotenie-callcentra", icon: "📞", label: "Vyhodnotenie callcentra" },
+  { href: "/users",                   icon: "👥", label: "Používatelia" },
   { href: "/zmena-hesla",     icon: "🔑", label: "Zmena hesla" },
 ];
 

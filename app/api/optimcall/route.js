@@ -5,7 +5,44 @@ import { randomUUID } from "crypto";
 
 const HOST = "autorealitka.m2.optimcall.cz";
 
-// ── Helper: parse $numberLong ─────────────────────────────────────────────────
+const WASITLEAD_KEY = "75d70860fca1d25d8ed8ac4c533979b62d93e1f6";
+const NAVOLALA_KEY  = "03fcbb91323260625766779aee5b4589498069b4";
+const WASITLEAD_TRUE = 805;
+
+// ── Agent registry ─────────────────────────────────────────────────────────────
+// navolalaId = Pipedrive enum option ID for the "Navolala" field
+// ext        = OptimCall extension (klapka); null if not yet assigned
+const AGENTS = [
+  { navolalaId: 418, nick: "Anička",  fullName: "Annamária Durcová",  ext: null },
+  { navolalaId: 419, nick: "Braňo",   fullName: "Braňo",              ext: null },
+  { navolalaId: 420, nick: "Daniel",  fullName: "Daniel Ondriga",      ext: null },
+  { navolalaId: 421, nick: "Kača",    fullName: "Katarína Durcová",   ext: null },
+  { navolalaId: 422, nick: "Miška",   fullName: "Michaela Knezelová", ext: null },
+  { navolalaId: 935, nick: "Patress", fullName: "Patrik Baláž",       ext: null },
+  { navolalaId: 426, nick: "Sandra",  fullName: "Sandra Lechnerová",  ext: "303" },
+];
+
+// Match an OptimCall srcName / src (extension) to an AGENTS entry
+function findAgent(srcName, src) {
+  // 1. Explicit extension match
+  const byExt = AGENTS.find(a => a.ext && a.ext === src);
+  if (byExt) return byExt;
+
+  const name = (srcName || "").toLowerCase();
+
+  // 2. Nick match (Anička, Kača, …)
+  const byNick = AGENTS.find(a => name.includes(a.nick.toLowerCase()));
+  if (byNick) return byNick;
+
+  // 3. Significant word from fullName (len > 3, skip very common words)
+  const byFull = AGENTS.find(a => {
+    const words = a.fullName.toLowerCase().split(" ");
+    return words.some(w => w.length > 4 && name.includes(w));
+  });
+  return byFull || null;
+}
+
+// ── Helper: parse $numberLong ──────────────────────────────────────────────────
 function nl(val) {
   if (!val) return 0;
   if (typeof val === "number") return val;
@@ -13,13 +50,10 @@ function nl(val) {
   return 0;
 }
 
-// ── WebSocket: authenticate and return open ws ────────────────────────────────
+// ── WebSocket: authenticate ────────────────────────────────────────────────────
 function wsAuth() {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`wss://${HOST}/websocket`, {
-      rejectUnauthorized: false,
-      headers: { Cookie: "sessionId=" + randomUUID() },
-    });
+    const ws = new WebSocket(`wss://${HOST}/websocket`, { rejectUnauthorized: false });
     let authSent = false;
     const t = setTimeout(() => { ws.terminate(); reject(new Error("auth timeout")); }, 12000);
 
@@ -28,7 +62,6 @@ function wsAuth() {
       const msg = JSON.parse(raw.toString());
       const cls = msg._class || "";
 
-      // Step 1: initial Unknown ConnectionIdentity → send auth
       if (!authSent && cls.includes("ConnectionIdentity") && msg.activeIdentity?._class?.includes("Unknown")) {
         authSent = true;
         ws.send(JSON.stringify({
@@ -39,8 +72,6 @@ function wsAuth() {
         }));
         return;
       }
-
-      // Step 2: second ConnectionIdentity with real identity → authenticated
       if (authSent && cls.includes("ConnectionIdentity") && msg.activeIdentity?.id) {
         clearTimeout(t);
         resolve(ws);
@@ -49,7 +80,7 @@ function wsAuth() {
   });
 }
 
-// ── WebSocket: fetch call records in pages ────────────────────────────────────
+// ── WebSocket: fetch call records ──────────────────────────────────────────────
 async function fetchCallRecords(dateFrom, dateTo) {
   const ws = await wsAuth();
   const containerId = randomUUID();
@@ -60,33 +91,21 @@ async function fetchCallRecords(dateFrom, dateTo) {
     let fetchSent = false;
     let pageStart = 0;
 
-    const t = setTimeout(() => {
-      ws.terminate();
-      // Return whatever we collected so far rather than failing completely
-      resolve(allRecords);
-    }, 25000);
+    const t = setTimeout(() => { ws.terminate(); resolve(allRecords); }, 25000);
 
     ws.on("error", (e) => { clearTimeout(t); reject(e); });
 
-    // Open container
     ws.send(JSON.stringify({
       _class:         "com.optimsys.costra.containers.Container$Open",
       containerId,
       containerClass: "com.optimsys.costra.optimcall.call.ui.CallHistory",
-      params: {
-        filter:   { dateFrom, dateTo },
-        search:   "",
-        ordering: { startTime: -1 },
-        start:    0,
-        limit:    PAGE,
-      },
+      params: { filter: { dateFrom, dateTo }, search: "", ordering: { startTime: -1 }, start: 0, limit: PAGE },
     }));
 
     ws.on("message", (raw) => {
       const msg = JSON.parse(raw.toString());
       const cls = msg._class || "";
 
-      // SuccessReply → send fetch
       if (cls.includes("SuccessReply") && !fetchSent) {
         fetchSent = true;
         ws.send(JSON.stringify({
@@ -101,12 +120,10 @@ async function fetchCallRecords(dateFrom, dateTo) {
         return;
       }
 
-      // Data received
       if (cls.includes("ListContainer$Fetched")) {
         const list = msg.data?.list || [];
         allRecords = allRecords.concat(list);
 
-        // Paginate if we got a full page (cap at 3000 records to avoid timeout)
         if (list.length === PAGE && allRecords.length < 3000) {
           pageStart += PAGE;
           ws.send(JSON.stringify({
@@ -134,93 +151,165 @@ async function fetchCallRecords(dateFrom, dateTo) {
   });
 }
 
-// ── Parse call records into per-agent per-day stats ───────────────────────────
-// Only include agents whose src looks like an internal extension (short number, no +)
-function isInternalExt(src) {
-  return src && !src.startsWith("+") && src.length <= 6;
+// ── Pipedrive: fetch wasItLead=true deals ──────────────────────────────────────
+async function fetchPipedriveLeads(dateFrom, dateTo) {
+  const apiToken = process.env.PIPEDRIVE_API_TOKEN;
+  let start = 0;
+  const limit = 500;
+  const results = []; // [{ date, navolalaId }]
+
+  while (true) {
+    const url =
+      `https://api.pipedrive.com/v1/deals?api_token=${apiToken}` +
+      `&status=all&sort=add_time+DESC&start=${start}&limit=${limit}`;
+    const res  = await fetch(url, { cache: "no-store" });
+    const json = await res.json();
+    const deals = json.data || [];
+    if (deals.length === 0) break;
+
+    let reachedEnd = false;
+    for (const deal of deals) {
+      const addDate = (deal.add_time || "").slice(0, 10);
+      if (addDate < dateFrom) { reachedEnd = true; break; }
+      if (addDate > dateTo) continue;
+      if (deal[WASITLEAD_KEY] !== WASITLEAD_TRUE) continue;
+      results.push({ date: addDate, navolalaId: deal[NAVOLALA_KEY] });
+    }
+
+    if (reachedEnd) break;
+    if (!json.additional_data?.pagination?.more_items_in_collection) break;
+    start += limit;
+  }
+
+  return results;
 }
 
-function parseStats(records, dateFrom, dateTo) {
-  const agents = {};
+// ── Build per-agent per-day stats ──────────────────────────────────────────────
+// obvolane = answered OptimCall calls (secConn > 0)
+// navolane = wasItLead=true Pipedrive deals
+function buildStats(callRecords, pipedriveLeads, dateFrom, dateTo) {
+  // --- OptimCall: obvolane per (agentKey, date) ---
+  // obvolaneMap[agentKey][date] = { obvolane, totalSecs, src, srcName }
+  const obvolaneMap = {};
+  const extToKey    = {}; // memoize ext→agentKey
 
-  for (const r of records) {
+  for (const r of callRecords) {
     const src     = r.src || "";
-    const name    = r.srcName || src;
-    const dst     = r.dst || "";
+    const srcName = r.srcName || src;
     const secConn = nl(r.secondsConnected);
     const startMs = nl(r.startTime);
 
-    // Only count outgoing calls from internal extensions
-    if (!isInternalExt(src)) continue;
+    // Only outgoing internal extensions
+    if (!src || src.startsWith("+") || src.length > 6) continue;
 
-    // Date of the call (UTC date — close enough for business hours in CET)
-    const date = startMs
-      ? new Date(startMs).toISOString().slice(0, 10)
-      : null;
+    const date = startMs ? new Date(startMs).toISOString().slice(0, 10) : null;
+    if (!date || date < dateFrom || date > dateTo) continue;
 
-    // Client-side date filter (server filter may not restrict properly)
-    if (date && dateFrom && date < dateFrom) continue;
-    if (date && dateTo   && date > dateTo)   continue;
-    if (!date) continue;
+    // Only count answered calls (secConn > 0) → these are "obvolané"
+    if (secConn <= 0) continue;
 
-    if (!agents[src]) agents[src] = { src, name, days: {} };
-    if (!agents[src].days[date]) {
-      agents[src].days[date] = { obvolane: 0, navolane: 0, totalSecs: 0 };
+    // Identify agent
+    if (!extToKey[src]) {
+      const ag = findAgent(srcName, src);
+      extToKey[src] = ag ? ag.nick : srcName || src;
     }
+    const key = extToKey[src];
 
-    const d = agents[src].days[date];
-    d.obvolane++;                         // total call attempts
-    if (secConn > 0) {
-      d.navolane++;                       // answered calls
-      d.totalSecs += secConn;
-    }
+    if (!obvolaneMap[key]) obvolaneMap[key] = {};
+    if (!obvolaneMap[key][date]) obvolaneMap[key][date] = { obvolane: 0, totalSecs: 0, src, srcName };
+    obvolaneMap[key][date].obvolane++;
+    obvolaneMap[key][date].totalSecs += secConn;
   }
 
-  // Flatten into array
-  return Object.values(agents).map((agent) => {
-    const dayStats = Object.entries(agent.days)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, d]) => ({
+  // --- Pipedrive: navolane per (agentKey, date) ---
+  const navolaneMap = {}; // navolaneMap[agentKey][date] = count
+
+  for (const { date, navolalaId } of pipedriveLeads) {
+    const ag = AGENTS.find(a => a.navolalaId === navolalaId);
+    if (!ag) continue;
+    const key = ag.nick;
+    if (!navolaneMap[key]) navolaneMap[key] = {};
+    navolaneMap[key][date] = (navolaneMap[key][date] || 0) + 1;
+  }
+
+  // --- Merge: collect all agent keys from both sources ---
+  const allKeys = new Set([...Object.keys(obvolaneMap), ...Object.keys(navolaneMap)]);
+
+  // Collect all dates in range
+  const allDates = new Set();
+  for (const [, days] of Object.entries(obvolaneMap)) Object.keys(days).forEach(d => allDates.add(d));
+  for (const [, days] of Object.entries(navolaneMap)) Object.keys(days).forEach(d => allDates.add(d));
+
+  const agents = [];
+
+  for (const key of allKeys) {
+    const ag  = AGENTS.find(a => a.nick === key);
+    const dates = new Set([
+      ...Object.keys(obvolaneMap[key] || {}),
+      ...Object.keys(navolaneMap[key] || {}),
+    ]);
+
+    const dayStats = [...dates].sort().map(date => {
+      const o = obvolaneMap[key]?.[date] || {};
+      const obvolane  = o.obvolane  || 0;
+      const navolane  = navolaneMap[key]?.[date] || 0;
+      const totalSecs = o.totalSecs || 0;
+      return {
         date,
-        obvolane:   d.obvolane,
-        navolane:   d.navolane,
-        efektivita: d.obvolane > 0 ? Math.round((d.navolane / d.obvolane) * 100) : 0,
-        totalSecs:  d.totalSecs,
-      }));
+        obvolane,
+        navolane,
+        efektivita: obvolane > 0 ? Math.round((navolane / obvolane) * 100) : 0,
+        totalSecs,
+      };
+    });
 
     const totObv = dayStats.reduce((s, d) => s + d.obvolane, 0);
     const totNav = dayStats.reduce((s, d) => s + d.navolane, 0);
+    const totSec = dayStats.reduce((s, d) => s + d.totalSecs, 0);
 
-    return {
-      src:           agent.src,
-      name:          agent.name,
+    // Try to find OptimCall ext/srcName for this agent
+    const firstODay = Object.values(obvolaneMap[key] || {})[0];
+    const src     = ag?.ext || firstODay?.src || "";
+    const srcName = ag?.fullName || firstODay?.srcName || key;
+
+    agents.push({
+      nick:          key,
+      fullName:      ag?.fullName || key,
+      src,
       days:          dayStats,
       totalObvolane: totObv,
       totalNavolane: totNav,
       efektivita:    totObv > 0 ? Math.round((totNav / totObv) * 100) : 0,
-      totalSecs:     dayStats.reduce((s, d) => s + d.totalSecs, 0),
-    };
-  })
-  .filter((a) => a.totalObvolane > 0)
-  .sort((a, b) => b.totalObvolane - a.totalObvolane);
+      totalSecs:     totSec,
+    });
+  }
+
+  return agents
+    .filter(a => a.totalObvolane > 0 || a.totalNavolane > 0)
+    .sort((a, b) => b.totalNavolane - a.totalNavolane || b.totalObvolane - a.totalObvolane);
 }
 
-// ── GET handler ───────────────────────────────────────────────────────────────
+// ── GET handler ────────────────────────────────────────────────────────────────
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const dateFrom = searchParams.get("dateFrom") || new Date().toISOString().slice(0, 10);
     const dateTo   = searchParams.get("dateTo")   || new Date().toISOString().slice(0, 10);
 
-    const records = await fetchCallRecords(dateFrom, dateTo);
-    const agents  = parseStats(records, dateFrom, dateTo);
+    // Fetch both sources in parallel
+    const [callRecords, pipedriveLeads] = await Promise.all([
+      fetchCallRecords(dateFrom, dateTo),
+      fetchPipedriveLeads(dateFrom, dateTo),
+    ]);
 
+    const agents   = buildStats(callRecords, pipedriveLeads, dateFrom, dateTo);
     const totalObv = agents.reduce((s, a) => s + a.totalObvolane, 0);
     const totalNav = agents.reduce((s, a) => s + a.totalNavolane, 0);
 
     return Response.json({
       ok: true,
-      recordCount: records.length,
+      recordCount:    callRecords.length,
+      leadCount:      pipedriveLeads.length,
       dateFrom,
       dateTo,
       summary: {

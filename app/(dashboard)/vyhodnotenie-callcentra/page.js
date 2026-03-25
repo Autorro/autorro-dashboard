@@ -84,10 +84,13 @@ function AgentRow({ agent, rank }) {
         <div className="w-6 text-center text-xs font-bold text-gray-400 flex-shrink-0">
           {rank}
         </div>
-        <Avatar name={agent.name} />
+        <Avatar name={agent.fullName} />
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-900 text-sm truncate">{agent.name}</p>
-          <p className="text-xs text-gray-400">ext. {agent.src}</p>
+          <p className="font-semibold text-gray-900 text-sm truncate">{agent.fullName}</p>
+          <p className="text-xs text-gray-400">
+            {agent.nick}
+            {agent.src ? ` · ext. ${agent.src}` : ""}
+          </p>
         </div>
 
         {/* Stats */}
@@ -198,7 +201,7 @@ function LeaderboardTable({ agents }) {
     <div className="bg-white rounded-2xl shadow-sm overflow-x-auto">
       <div className="px-5 py-4 border-b border-gray-100">
         <h2 className="font-extrabold text-gray-900">📊 Prehľad výkonu</h2>
-        <p className="text-xs text-gray-400 mt-0.5">Poradie agentov podľa obvolaných čísel</p>
+        <p className="text-xs text-gray-400 mt-0.5">Obvolané = prepojené hovory (OptimCall) · Navolané = wasItLead yes (Pipedrive)</p>
       </div>
       <table className="w-full text-sm">
         <thead>
@@ -217,10 +220,13 @@ function LeaderboardTable({ agents }) {
               <td className="px-5 py-3 text-gray-400 font-semibold">{i + 1}</td>
               <td className="px-5 py-3">
                 <div className="flex items-center gap-2">
-                  <Avatar name={a.name} />
+                  <Avatar name={a.fullName} />
                   <div>
-                    <p className="font-semibold text-gray-900">{a.name}</p>
-                    <p className="text-xs text-gray-400">ext. {a.src}</p>
+                    <p className="font-semibold text-gray-900">{a.fullName}</p>
+                    <p className="text-xs text-gray-400">
+                      {a.nick}
+                      {a.src ? ` · ext. ${a.src}` : ""}
+                    </p>
                   </div>
                 </div>
               </td>
@@ -356,11 +362,15 @@ export default function VyhodnotenieCCPage() {
         <>
           {/* Summary cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard icon="📞" label="Obvolané čísla"  value={data.summary.obvolane}                         color="#FF501C" />
-            <StatCard icon="✅" label="Navolané"         value={data.summary.navolane}                         color="#22c55e" />
-            <StatCard icon="📊" label="Efektivita"       value={data.summary.efektivita + "%"}                  color="#8b5cf6" />
-            <StatCard icon="⏱️" label="Celkový čas"     value={fmtDur(data.summary.totalSecs)}                  color="#3b82f6"
-              sub={`${data.recordCount} hovorov`}
+            <StatCard icon="📞" label="Obvolané (prepojené)" value={data.summary.obvolane}          color="#FF501C"
+              sub="Hovory so sekúndami spojenia"
+            />
+            <StatCard icon="🎯" label="Navolané (leady)"   value={data.summary.navolane}          color="#22c55e"
+              sub={`${data.leadCount ?? ""} wasItLead=yes z Pipedrive`}
+            />
+            <StatCard icon="📊" label="Efektivita"          value={data.summary.efektivita + "%"}  color="#8b5cf6" />
+            <StatCard icon="⏱️" label="Celkový čas"         value={fmtDur(data.summary.totalSecs)} color="#3b82f6"
+              sub={`${data.recordCount} hovorov (OptimCall)`}
             />
           </div>
 

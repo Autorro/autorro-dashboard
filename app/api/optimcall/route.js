@@ -5,15 +5,12 @@ import { randomUUID } from "crypto";
 
 const HOST = "autorealitka.m2.optimcall.cz";
 
-const NAVOLALA_KEY  = "03fcbb91323260625766779aee5b4589498069b4";
+const NAVOLALA_KEY   = "03fcbb91323260625766779aee5b4589498069b4";
+const WASITLEAD_KEY  = "75d70860fca1d25d8ed8ac4c533979b62d93e1f6";
+// Pipedrive returns enum IDs as strings; 805 = "true" for wasItLead
+const WASITLEAD_TRUE = "805";
 
-// Stage IDs where a deal = "navolané" (stretnutie dohodnuté telefonistom)
-// 7  = DOHODNUŤ STRETNUTIE (SK pipeline)
-// 17 = DOHODNOUT SETKÁNÍ   (CZ pipeline)
-const NAVOLANE_STAGE_IDS = [7, 17];
-
-// Pipedrive navolala option IDs that belong to telefonists (excludes webforms etc.)
-// Pipedrive returns enum option IDs as strings → store as strings
+// Pipedrive navolala option IDs that belong to telefonists (as strings)
 const TELEFONIST_IDS = new Set(["418", "419", "420", "421", "422", "935", "426"]);
 
 // ── Agent registry ─────────────────────────────────────────────────────────────
@@ -160,39 +157,40 @@ async function fetchCallRecords(dateFrom, dateTo) {
 
 // ── Pipedrive: fetch "navolané" deals ─────────────────────────────────────────
 // A deal counts as "navolané" when:
-//   • its stage is DOHODNUŤ STRETNUTIE (or CZ equivalent)
+//   • wasItLead = true (805)
 //   • the "Navolala" field is a known telefonist
 //   • the deal was CREATED (add_time) within the requested date range
+// Stage is intentionally NOT filtered — deals move between stages over time,
+// but the add_time (creation date) stays fixed and wasItLead=true is permanent.
 async function fetchPipedriveLeads(dateFrom, dateTo) {
   const apiToken = process.env.PIPEDRIVE_API_TOKEN;
   const results  = []; // [{ date, navolalaId }]
+  let start = 0;
 
-  for (const stageId of NAVOLANE_STAGE_IDS) {
-    let start = 0;
+  while (true) {
+    const url =
+      `https://api.pipedrive.com/v1/deals?api_token=${apiToken}` +
+      `&status=all&sort=add_time+DESC&start=${start}&limit=500`;
+    const res  = await fetch(url, { cache: "no-store" });
+    const json = await res.json();
+    const deals = json.data || [];
+    if (deals.length === 0) break;
 
-    while (true) {
-      const url =
-        `https://api.pipedrive.com/v1/deals?api_token=${apiToken}` +
-        `&stage_id=${stageId}&status=all&sort=add_time+DESC&start=${start}&limit=500`;
-      const res  = await fetch(url, { cache: "no-store" });
-      const json = await res.json();
-      const deals = json.data || [];
-      if (deals.length === 0) break;
-
-      let reachedEnd = false;
-      for (const deal of deals) {
-        const addDate    = (deal.add_time || "").slice(0, 10);
-        if (addDate < dateFrom) { reachedEnd = true; break; }
-        if (addDate > dateTo)   continue;
-        const navolalaId = deal[NAVOLALA_KEY];
-        if (!TELEFONIST_IDS.has(navolalaId)) continue;
-        results.push({ date: addDate, navolalaId });
-      }
-
-      if (reachedEnd) break;
-      if (!json.additional_data?.pagination?.more_items_in_collection) break;
-      start += 500;
+    let reachedEnd = false;
+    for (const deal of deals) {
+      const addDate    = (deal.add_time || "").slice(0, 10);
+      if (addDate < dateFrom) { reachedEnd = true; break; }
+      if (addDate > dateTo)   continue;
+      const wasItLead  = String(deal[WASITLEAD_KEY] || "");
+      if (wasItLead !== WASITLEAD_TRUE) continue;
+      const navolalaId = String(deal[NAVOLALA_KEY]  || "");
+      if (!TELEFONIST_IDS.has(navolalaId)) continue;
+      results.push({ date: addDate, navolalaId });
     }
+
+    if (reachedEnd) break;
+    if (!json.additional_data?.pagination?.more_items_in_collection) break;
+    start += 500;
   }
 
   return results;

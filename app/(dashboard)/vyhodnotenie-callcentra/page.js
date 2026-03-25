@@ -2,9 +2,9 @@
 import { useState, useEffect, useCallback } from "react";
 
 const PERIODS = [
-  { label: "Dnes",         days: 0 },
-  { label: "Posledných 7 dní", days: 7 },
-  { label: "Tento mesiac", days: 30 },
+  { label: "Dnes",              days: 0  },
+  { label: "Posledných 7 dní",  days: 7  },
+  { label: "Tento mesiac",      days: 30 },
   { label: "Posledných 90 dní", days: 90 },
 ];
 
@@ -32,6 +32,12 @@ function fmtDur(secs) {
   return `${s} s`;
 }
 
+function pctColor(pct) {
+  if (pct >= 70) return "#22c55e";
+  if (pct >= 40) return "#f59e0b";
+  return "#ef4444";
+}
+
 function StatCard({ icon, label, value, sub, color = "#FF501C" }) {
   return (
     <div className="bg-white rounded-2xl shadow-sm p-5 flex items-start gap-4">
@@ -50,94 +56,244 @@ function StatCard({ icon, label, value, sub, color = "#FF501C" }) {
   );
 }
 
-function UserRow({ user }) {
+// Initials avatar
+function Avatar({ name }) {
+  const parts = (name || "?").split(" ");
+  const initials = parts.length >= 2
+    ? parts[0][0] + parts[parts.length - 1][0]
+    : (name || "?")[0];
+  return (
+    <div className="w-9 h-9 rounded-full bg-[#481132] text-white font-bold text-sm flex items-center justify-center flex-shrink-0 uppercase">
+      {initials}
+    </div>
+  );
+}
+
+// Agent row with expandable day-by-day table
+function AgentRow({ agent, rank }) {
   const [open, setOpen] = useState(false);
-  const pct = user.calls
-    ? Math.round((user.answered / user.calls) * 100)
-    : null;
 
   return (
     <div className="border-b last:border-0 border-gray-100">
+      {/* Summary row */}
       <button
         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
         onClick={() => setOpen(!open)}
       >
-        <div className="w-9 h-9 rounded-full bg-[#481132] text-white font-bold text-sm flex items-center justify-center flex-shrink-0">
-          {user.login[0].toUpperCase()}
+        {/* Rank badge */}
+        <div className="w-6 text-center text-xs font-bold text-gray-400 flex-shrink-0">
+          {rank}
         </div>
+        <Avatar name={agent.name} />
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-900 text-sm truncate">{user.login}</p>
-          <p className="text-xs text-gray-400">
-            {user.status || "—"}
-          </p>
+          <p className="font-semibold text-gray-900 text-sm truncate">{agent.name}</p>
+          <p className="text-xs text-gray-400">ext. {agent.src}</p>
         </div>
-        <div className="flex items-center gap-4 flex-shrink-0">
-          <div className="text-right">
-            <p className="font-bold text-gray-900">{user.calls}</p>
-            <p className="text-xs text-gray-400">hovorov</p>
+
+        {/* Stats */}
+        <div className="flex items-center gap-4 flex-shrink-0 text-right">
+          <div>
+            <p className="font-bold text-gray-900">{agent.totalObvolane}</p>
+            <p className="text-xs text-gray-400">obvolané</p>
           </div>
-          <div className="text-right">
-            <p className="font-bold text-gray-900">{user.uniqueNumbers}</p>
-            <p className="text-xs text-gray-400">čísel</p>
+          <div>
+            <p className="font-bold text-gray-900">{agent.totalNavolane}</p>
+            <p className="text-xs text-gray-400">navolané</p>
           </div>
-          {pct !== null && (
-            <div className="w-20 hidden sm:block">
-              <div className="flex justify-between text-xs text-gray-500 mb-1">
-                <span>zdv.</span>
-                <span>{pct}%</span>
-              </div>
-              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: pct + "%",
-                    backgroundColor: pct >= 70 ? "#22c55e" : pct >= 40 ? "#f59e0b" : "#ef4444",
-                  }}
-                />
-              </div>
+          {/* Efektivita bar */}
+          <div className="w-20 hidden sm:block">
+            <div className="flex justify-between text-xs text-gray-500 mb-1">
+              <span>efek.</span>
+              <span style={{ color: pctColor(agent.efektivita) }}>{agent.efektivita}%</span>
             </div>
-          )}
+            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: Math.min(agent.efektivita, 100) + "%",
+                  backgroundColor: pctColor(agent.efektivita),
+                }}
+              />
+            </div>
+          </div>
           <span className="text-gray-400 text-xs">{open ? "▲" : "▼"}</span>
         </div>
       </button>
+
+      {/* Expandable: day-by-day breakdown */}
       {open && (
-        <div className="px-4 pb-4 pt-1 grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-50">
-          {[
-            ["📞", "Všetky hovory", user.calls],
-            ["✅", "Zdvihnuté", user.answered],
-            ["❌", "Zmešk.", user.missed],
-            ["☎️", "Jedinečné čísla", user.uniqueNumbers],
-            ["⬆️", "Odchádzajúce", user.outgoing],
-            ["⬇️", "Prichádzajúce", user.incoming],
-            ["⏱️", "Celk. čas", fmtDur(user.totalDuration)],
-            ["📊", "Úspešnosť", pct !== null ? pct + "%" : "—"],
-          ].map(([icon, label, val]) => (
-            <div key={label} className="bg-white rounded-xl p-3 shadow-sm">
-              <p className="text-xs text-gray-400">{icon} {label}</p>
-              <p className="font-bold text-gray-900 text-sm mt-0.5">{val}</p>
+        <div className="bg-gray-50 px-4 pb-4 pt-2">
+          {agent.days.length === 0 ? (
+            <p className="text-xs text-gray-400 py-2">Žiadne záznamy</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-gray-400 uppercase">
+                    <th className="text-left py-2 pr-4">Dátum</th>
+                    <th className="text-right py-2 px-2">Obvolané</th>
+                    <th className="text-right py-2 px-2">Navolané</th>
+                    <th className="text-right py-2 px-2">Efektivita</th>
+                    <th className="text-right py-2 pl-2">Čas</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {agent.days.map((d) => (
+                    <tr key={d.date} className="border-t border-gray-100">
+                      <td className="py-2 pr-4 font-medium text-gray-700">
+                        {new Date(d.date + "T12:00:00Z").toLocaleDateString("sk-SK", {
+                          day: "numeric", month: "short", weekday: "short",
+                        })}
+                      </td>
+                      <td className="py-2 px-2 text-right font-semibold text-gray-900">{d.obvolane}</td>
+                      <td className="py-2 px-2 text-right font-semibold text-gray-900">{d.navolane}</td>
+                      <td className="py-2 px-2 text-right">
+                        <span
+                          className="px-1.5 py-0.5 rounded text-xs font-bold"
+                          style={{
+                            backgroundColor: pctColor(d.efektivita) + "20",
+                            color: pctColor(d.efektivita),
+                          }}
+                        >
+                          {d.efektivita}%
+                        </span>
+                      </td>
+                      <td className="py-2 pl-2 text-right text-gray-500">{fmtDur(d.totalSecs)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                {/* Totals row */}
+                <tfoot>
+                  <tr className="border-t-2 border-gray-200 font-bold text-gray-900">
+                    <td className="py-2 pr-4">Spolu</td>
+                    <td className="py-2 px-2 text-right">{agent.totalObvolane}</td>
+                    <td className="py-2 px-2 text-right">{agent.totalNavolane}</td>
+                    <td className="py-2 px-2 text-right">
+                      <span
+                        className="px-1.5 py-0.5 rounded text-xs font-bold"
+                        style={{
+                          backgroundColor: pctColor(agent.efektivita) + "20",
+                          color: pctColor(agent.efektivita),
+                        }}
+                      >
+                        {agent.efektivita}%
+                      </span>
+                    </td>
+                    <td className="py-2 pl-2 text-right text-gray-500">{fmtDur(agent.totalSecs)}</td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
-          ))}
+          )}
         </div>
       )}
     </div>
   );
 }
 
+// Summary leaderboard table (all agents in one view)
+function LeaderboardTable({ agents }) {
+  if (!agents || agents.length === 0) return null;
+  return (
+    <div className="bg-white rounded-2xl shadow-sm overflow-x-auto">
+      <div className="px-5 py-4 border-b border-gray-100">
+        <h2 className="font-extrabold text-gray-900">📊 Prehľad výkonu</h2>
+        <p className="text-xs text-gray-400 mt-0.5">Poradie agentov podľa obvolaných čísel</p>
+      </div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-xs text-gray-400 uppercase bg-gray-50">
+            <th className="text-left px-5 py-3">#</th>
+            <th className="text-left px-5 py-3">Agent</th>
+            <th className="text-right px-4 py-3">Obvolané</th>
+            <th className="text-right px-4 py-3">Navolané</th>
+            <th className="text-right px-4 py-3">Efektivita</th>
+            <th className="text-right px-4 py-3">Čas</th>
+          </tr>
+        </thead>
+        <tbody>
+          {agents.map((a, i) => (
+            <tr key={a.src} className="border-t border-gray-100 hover:bg-gray-50">
+              <td className="px-5 py-3 text-gray-400 font-semibold">{i + 1}</td>
+              <td className="px-5 py-3">
+                <div className="flex items-center gap-2">
+                  <Avatar name={a.name} />
+                  <div>
+                    <p className="font-semibold text-gray-900">{a.name}</p>
+                    <p className="text-xs text-gray-400">ext. {a.src}</p>
+                  </div>
+                </div>
+              </td>
+              <td className="px-4 py-3 text-right font-bold text-gray-900">{a.totalObvolane}</td>
+              <td className="px-4 py-3 text-right font-bold text-gray-900">{a.totalNavolane}</td>
+              <td className="px-4 py-3 text-right">
+                <div className="flex items-center justify-end gap-2">
+                  <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden hidden sm:block">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: Math.min(a.efektivita, 100) + "%",
+                        backgroundColor: pctColor(a.efektivita),
+                      }}
+                    />
+                  </div>
+                  <span
+                    className="font-bold text-xs px-1.5 py-0.5 rounded"
+                    style={{
+                      color: pctColor(a.efektivita),
+                      backgroundColor: pctColor(a.efektivita) + "20",
+                    }}
+                  >
+                    {a.efektivita}%
+                  </span>
+                </div>
+              </td>
+              <td className="px-4 py-3 text-right text-gray-500">{fmtDur(a.totalSecs)}</td>
+            </tr>
+          ))}
+        </tbody>
+        {/* Totals */}
+        {agents.length > 1 && (() => {
+          const totObv = agents.reduce((s, a) => s + a.totalObvolane, 0);
+          const totNav = agents.reduce((s, a) => s + a.totalNavolane, 0);
+          const totEfk = totObv > 0 ? Math.round((totNav / totObv) * 100) : 0;
+          const totSec = agents.reduce((s, a) => s + a.totalSecs, 0);
+          return (
+            <tfoot>
+              <tr className="border-t-2 border-gray-200 bg-gray-50 font-bold text-gray-900">
+                <td className="px-5 py-3" colSpan={2}>Celkovo</td>
+                <td className="px-4 py-3 text-right">{totObv}</td>
+                <td className="px-4 py-3 text-right">{totNav}</td>
+                <td className="px-4 py-3 text-right">
+                  <span
+                    className="font-bold text-xs px-1.5 py-0.5 rounded"
+                    style={{ color: pctColor(totEfk), backgroundColor: pctColor(totEfk) + "20" }}
+                  >
+                    {totEfk}%
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-right text-gray-500">{fmtDur(totSec)}</td>
+              </tr>
+            </tfoot>
+          );
+        })()}
+      </table>
+    </div>
+  );
+}
+
 export default function VyhodnotenieCCPage() {
   const [periodIdx, setPeriodIdx] = useState(0);
-  const [data, setData]   = useState(null);
+  const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
-  const [sortBy, setSortBy]   = useState("calls");
 
   const load = useCallback(async (idx) => {
     setLoading(true);
     setError(null);
     try {
       const { dateFrom, dateTo } = getDateRange(PERIODS[idx].days);
-      const res = await fetch(
-        `/api/optimcall?dateFrom=${dateFrom}&dateTo=${dateTo}`
-      );
+      const res  = await fetch(`/api/optimcall?dateFrom=${dateFrom}&dateTo=${dateTo}`);
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "Chyba načítania");
       setData(json);
@@ -149,13 +305,6 @@ export default function VyhodnotenieCCPage() {
   }, []);
 
   useEffect(() => { load(periodIdx); }, [periodIdx, load]);
-
-  const sorted = data?.users
-    ? [...data.users].sort((a, b) => b[sortBy] - a[sortBy])
-    : [];
-
-  const usersWithCalls = sorted.filter((u) => u.calls > 0);
-  const allUsers       = sorted;
 
   return (
     <div className="space-y-6">
@@ -186,13 +335,16 @@ export default function VyhodnotenieCCPage() {
         </div>
       </div>
 
-      {/* Loading / Error */}
+      {/* Loading */}
       {loading && (
         <div className="bg-white rounded-2xl shadow-sm p-10 text-center text-gray-400">
           <p className="text-4xl mb-3">⏳</p>
-          <p className="font-semibold">Načítavam dáta…</p>
+          <p className="font-semibold">Načítavam dáta z OptimCall…</p>
+          <p className="text-xs mt-1">Môže to chvíľu trvať</p>
         </div>
       )}
+
+      {/* Error */}
       {error && (
         <div className="bg-white rounded-2xl shadow-sm p-8 text-center text-red-500">
           <p className="text-3xl mb-2">⚠️</p>
@@ -204,110 +356,46 @@ export default function VyhodnotenieCCPage() {
         <>
           {/* Summary cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard icon="📞" label="Celkové hovory"    value={data.summary.totalCalls}    color="#FF501C" />
-            <StatCard icon="✅" label="Zdvihnuté"         value={data.summary.answered}       color="#22c55e" />
-            <StatCard icon="❌" label="Zmeškané"          value={data.summary.missed}         color="#ef4444" />
-            <StatCard icon="⏱️" label="Celkový čas"      value={fmtDur(data.summary.totalDuration)} color="#8b5cf6" />
+            <StatCard icon="📞" label="Obvolané čísla"  value={data.summary.obvolane}                         color="#FF501C" />
+            <StatCard icon="✅" label="Navolané"         value={data.summary.navolane}                         color="#22c55e" />
+            <StatCard icon="📊" label="Efektivita"       value={data.summary.efektivita + "%"}                  color="#8b5cf6" />
+            <StatCard icon="⏱️" label="Celkový čas"     value={fmtDur(data.summary.totalSecs)}                  color="#3b82f6"
+              sub={`${data.recordCount} hovorov`}
+            />
           </div>
 
-          {/* No call records notice */}
-          {!data.hasCallRecords && (
+          {/* No data */}
+          {data.agents.length === 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex gap-4 items-start">
               <span className="text-2xl">ℹ️</span>
               <div>
                 <p className="font-semibold text-amber-800">Žiadne záznamy hovorov</p>
                 <p className="text-sm text-amber-700 mt-1">
-                  Systém OptimCall je pripojený, ale pre vybraté obdobie neexistujú žiadne záznamy hovorov.
-                  Zoznam používateľov a liniek je zobrazený nižšie.
+                  Pre vybraté obdobie ({data.dateFrom} – {data.dateTo}) neexistujú žiadne záznamy hovorov.
                 </p>
               </div>
             </div>
           )}
 
-          {/* Phone lines */}
-          <div className="bg-white rounded-2xl shadow-sm">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="font-extrabold text-gray-900">📟 Telefónne linky</h2>
-              <span className="text-sm text-gray-400">{data.phoneLines.length} liniek</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-xs text-gray-400 uppercase bg-gray-50">
-                    <th className="text-left px-5 py-3">Číslo</th>
-                    <th className="text-left px-5 py-3">Správanie</th>
-                    <th className="text-left px-5 py-3">Presmerovanie</th>
-                    <th className="text-right px-5 py-3">Hovory</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.phoneLines.map((l) => (
-                    <tr key={l.id} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="px-5 py-3 font-semibold text-gray-900">{l.number}</td>
-                      <td className="px-5 py-3">
-                        <span className={
-                          "px-2 py-0.5 rounded-full text-xs font-medium " +
-                          (l.behavior === "redirect"
-                            ? "bg-blue-100 text-blue-700"
-                            : l.behavior === "scenario"
-                            ? "bg-purple-100 text-purple-700"
-                            : "bg-gray-100 text-gray-600")
-                        }>
-                          {l.behavior}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-gray-500">{l.redirectTo || "—"}</td>
-                      <td className="px-5 py-3 text-right font-bold text-gray-900">{l.calls}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          {/* Leaderboard table */}
+          {data.agents.length > 0 && <LeaderboardTable agents={data.agents} />}
 
-          {/* Agents */}
-          <div className="bg-white rounded-2xl shadow-sm">
-            <div className="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="font-extrabold text-gray-900">👥 Agenti</h2>
+          {/* Per-agent detail cards */}
+          {data.agents.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-sm">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h2 className="font-extrabold text-gray-900">👥 Detail podľa agenta</h2>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  {usersWithCalls.length} z {allUsers.length} mali hovory
+                  Kliknite na agenta pre denný rozpad
                 </p>
               </div>
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-gray-400">Zoradiť:</span>
-                {[
-                  { key: "calls",   label: "Hovory" },
-                  { key: "uniqueNumbers", label: "Čísla" },
-                  { key: "answered",label: "Zdvihnuté" },
-                  { key: "missed",  label: "Zmeškané" },
-                ].map(({ key, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => setSortBy(key)}
-                    className={
-                      "px-2.5 py-1 rounded-lg font-medium transition-colors " +
-                      (sortBy === key
-                        ? "bg-[#481132] text-white"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200")
-                    }
-                  >
-                    {label}
-                  </button>
+              <div>
+                {data.agents.map((a, i) => (
+                  <AgentRow key={a.src} agent={a} rank={i + 1} />
                 ))}
               </div>
             </div>
-            <div>
-              {allUsers.map((u) => (
-                <UserRow key={u.id} user={u} />
-              ))}
-              {allUsers.length === 0 && (
-                <div className="py-10 text-center text-gray-400 text-sm">
-                  Žiadni agenti
-                </div>
-              )}
-            </div>
-          </div>
+          )}
         </>
       )}
     </div>

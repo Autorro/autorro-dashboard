@@ -1,6 +1,6 @@
 import { cache as dataCache } from '@/lib/cache'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 300
 
 const NON_BROKERS = new Set([
   'development', 'api admin', 'asistent', 'kacena', 'digitaldreamers',

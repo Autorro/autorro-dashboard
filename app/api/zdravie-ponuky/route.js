@@ -2,7 +2,7 @@ import { fetchAllPages } from '@/lib/pipedrive'
 import { cache as dataCache } from '@/lib/cache'
 import { INZEROVANE_STAGES } from '@/lib/constants'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 600
 
 const BASE_FIELDS = [
   'id', 'title', 'owner_id', 'owner_name', 'stage_id', 'value', 'currency',

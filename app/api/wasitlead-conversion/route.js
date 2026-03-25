@@ -1,7 +1,7 @@
 import { fetchAllPages } from '@/lib/pipedrive'
 import { cache as dataCache } from '@/lib/cache'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 600
 
 const WASITLEAD_KEY = '75d70860fca1d25d8ed8ac4c533979b62d93e1f6'
 const WASITLEAD_YES = '805'

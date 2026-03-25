@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase-server'
 import { cache as dataCache } from '@/lib/cache'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 300
 
 async function fetchReakcnyData() {
   const { data, error } = await supabase

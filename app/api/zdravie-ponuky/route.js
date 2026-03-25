@@ -1,8 +1,8 @@
-import { fetchAllPages, createCache } from '@/lib/pipedrive'
+import { fetchAllPages } from '@/lib/pipedrive'
+import { cache as dataCache } from '@/lib/cache'
 import { INZEROVANE_STAGES } from '@/lib/constants'
 
-const CACHE_TTL = 10 * 60 * 1000
-const cache     = createCache(CACHE_TTL)
+export const dynamic = 'force-dynamic'
 
 const BASE_FIELDS = [
   'id', 'title', 'owner_id', 'owner_name', 'stage_id', 'value', 'currency',
@@ -36,18 +36,19 @@ async function fetchFieldMeta(apiToken) {
   return meta
 }
 
-async function fetchAllDeals(apiToken, meta) {
+async function fetchZdravieData() {
+  const apiToken = process.env.PIPEDRIVE_API_TOKEN
+  const meta     = await fetchFieldMeta(apiToken)
+
   const extraKeys = [meta.kmKey, meta.rokKey, meta.palivoKey].filter(Boolean)
   const fields    = [...BASE_FIELDS, ...extraKeys].join(',')
   const base      = `https://api.pipedrive.com/v1/deals?api_token=${apiToken}&limit=100&status=open&fields=${fields}`
 
-  // Paralelné načítanie všetkých stage naraz
   const results = await Promise.all(
     INZEROVANE_STAGES.map(stageId => fetchAllPages(`${base}&stage_id=${stageId}`))
   )
   const all = results.flat()
 
-  // Remap dynamických polí na stabilné názvy
   for (const d of all) {
     d._km     = meta.kmKey     ? d[meta.kmKey]     : null
     d._rok    = meta.rokKey    ? d[meta.rokKey]    : null
@@ -58,26 +59,20 @@ async function fetchAllDeals(apiToken, meta) {
   return all
 }
 
+const getCachedZdravie = dataCache(fetchZdravieData, 'zdravie-ponuky', 600)
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const force = searchParams.get('force') === '1'
 
-    const cached = cache.get(force)
-    if (cached !== null) {
-      return Response.json(cached, {
-        headers: { 'X-Cache': 'HIT', 'Cache-Control': 'public, max-age=600' },
-      })
+    if (force) {
+      const { revalidateTag } = await import('next/cache')
+      revalidateTag('zdravie-ponuky')
     }
 
-    const apiToken = process.env.PIPEDRIVE_API_TOKEN
-    const meta     = await fetchFieldMeta(apiToken)
-    const data     = await fetchAllDeals(apiToken, meta)
-    cache.set(data)
-
-    return Response.json(data, {
-      headers: { 'X-Cache': 'MISS', 'Cache-Control': 'no-store' },
-    })
+    const data = await getCachedZdravie()
+    return Response.json(data, { headers: { 'X-Cache': force ? 'REVALIDATED' : 'HIT' } })
   } catch {
     return Response.json({ error: 'Interná chyba' }, { status: 500 })
   }

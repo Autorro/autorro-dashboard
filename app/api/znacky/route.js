@@ -1,7 +1,8 @@
-import { fetchAllPages, createCache } from '@/lib/pipedrive'
+import { fetchAllPages } from '@/lib/pipedrive'
+import { cache as dataCache } from '@/lib/cache'
 
-const CACHE_TTL  = 10 * 60 * 1000
-const cache      = createCache(CACHE_TTL)
+export const dynamic = 'force-dynamic'
+
 const ZNACKA_KEY = 'c5d33ca43498a4e3e0e90dc8e1cfa3944107290d'
 
 function norm(s) {
@@ -153,46 +154,46 @@ async function fetchRawDeals(apiToken) {
   return [...open, ...won, ...lost]
 }
 
+async function fetchZnackyData() {
+  const apiToken  = process.env.PIPEDRIVE_API_TOKEN
+  const rawDeals  = await fetchRawDeals(apiToken)
+  const znackaMap = await fetchZnackaMap(apiToken, rawDeals)
+
+  const byNorm = {}
+  for (const d of rawDeals) {
+    const label = getZnacka(d, znackaMap)
+    const key   = norm(label)
+    if (!byNorm[key]) byNorm[key] = { brand: label, open: 0, won: 0, lost: 0 }
+    byNorm[key][d.status]++
+    if (label.length > byNorm[key].brand.length) byNorm[key].brand = label
+  }
+
+  return Object.values(byNorm)
+    .map(b => ({
+      brand:   b.brand,
+      open:    b.open,
+      won:     b.won,
+      lost:    b.lost,
+      total:   b.open + b.won + b.lost,
+      winRate: b.won + b.lost > 0 ? Math.round(b.won / (b.won + b.lost) * 100) : null,
+    }))
+    .sort((a, z) => z.total - a.total)
+}
+
+const getCachedZnacky = dataCache(fetchZnackyData, 'znacky', 600)
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const force = searchParams.get('force') === '1'
 
-    const cached = cache.get(force)
-    if (cached !== null) {
-      return Response.json(cached, {
-        headers: { 'X-Cache': 'HIT', 'X-Cache-Age': String(cache.age()) },
-      })
+    if (force) {
+      const { revalidateTag } = await import('next/cache')
+      revalidateTag('znacky')
     }
 
-    const apiToken  = process.env.PIPEDRIVE_API_TOKEN
-    const rawDeals  = await fetchRawDeals(apiToken)
-    const znackaMap = await fetchZnackaMap(apiToken, rawDeals)
-
-    const byNorm = {}
-    for (const d of rawDeals) {
-      const label = getZnacka(d, znackaMap)
-      const key   = norm(label)
-      if (!byNorm[key]) byNorm[key] = { brand: label, open: 0, won: 0, lost: 0 }
-      byNorm[key][d.status]++
-      if (label.length > byNorm[key].brand.length) byNorm[key].brand = label
-    }
-
-    const result = Object.values(byNorm)
-      .map(b => ({
-        brand:   b.brand,
-        open:    b.open,
-        won:     b.won,
-        lost:    b.lost,
-        total:   b.open + b.won + b.lost,
-        winRate: b.won + b.lost > 0 ? Math.round(b.won / (b.won + b.lost) * 100) : null,
-      }))
-      .sort((a, z) => z.total - a.total)
-
-    cache.set(result)
-    return Response.json(result, {
-      headers: { 'X-Cache': 'MISS', 'X-Fetched-At': new Date().toISOString() },
-    })
+    const result = await getCachedZnacky()
+    return Response.json(result, { headers: { 'X-Cache': force ? 'REVALIDATED' : 'HIT' } })
   } catch {
     return Response.json({ error: 'Interná chyba' }, { status: 500 })
   }

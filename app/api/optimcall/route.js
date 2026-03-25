@@ -301,37 +301,54 @@ function buildStats(callRecords, pipedriveLeads, dateFrom, dateTo) {
     .sort((a, b) => b.totalNavolane - a.totalNavolane || b.totalObvolane - a.totalObvolane);
 }
 
+// ── Cache wrapper (per date range, TTL 5 min) ─────────────────────────────────
+import { unstable_cache } from "next/cache";
+
+function getCachedOptimcall(dateFrom, dateTo) {
+  return unstable_cache(
+    async () => {
+      const [callRecords, pipedriveLeads] = await Promise.all([
+        fetchCallRecords(dateFrom, dateTo),
+        fetchPipedriveLeads(dateFrom, dateTo),
+      ]);
+      const agents   = buildStats(callRecords, pipedriveLeads, dateFrom, dateTo);
+      const totalObv = agents.reduce((s, a) => s + a.totalObvolane, 0);
+      const totalNav = agents.reduce((s, a) => s + a.totalNavolane, 0);
+      return {
+        ok: true,
+        recordCount:    callRecords.length,
+        leadCount:      pipedriveLeads.length,
+        dateFrom,
+        dateTo,
+        summary: {
+          obvolane:   totalObv,
+          navolane:   totalNav,
+          efektivita: totalObv > 0 ? Math.round((totalNav / totalObv) * 100) : 0,
+          totalSecs:  agents.reduce((s, a) => s + a.totalSecs, 0),
+        },
+        agents,
+      };
+    },
+    [`optimcall-${dateFrom}-${dateTo}`],
+    { revalidate: 300, tags: ["optimcall", "all"] }
+  )();
+}
+
 // ── GET handler ────────────────────────────────────────────────────────────────
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const dateFrom = searchParams.get("dateFrom") || new Date().toISOString().slice(0, 10);
     const dateTo   = searchParams.get("dateTo")   || new Date().toISOString().slice(0, 10);
+    const force    = searchParams.get("force") === "1";
 
-    // Fetch both sources in parallel
-    const [callRecords, pipedriveLeads] = await Promise.all([
-      fetchCallRecords(dateFrom, dateTo),
-      fetchPipedriveLeads(dateFrom, dateTo),
-    ]);
+    if (force) {
+      const { revalidateTag } = await import("next/cache");
+      revalidateTag("optimcall");
+    }
 
-    const agents   = buildStats(callRecords, pipedriveLeads, dateFrom, dateTo);
-    const totalObv = agents.reduce((s, a) => s + a.totalObvolane, 0);
-    const totalNav = agents.reduce((s, a) => s + a.totalNavolane, 0);
-
-    return Response.json({
-      ok: true,
-      recordCount:    callRecords.length,
-      leadCount:      pipedriveLeads.length,
-      dateFrom,
-      dateTo,
-      summary: {
-        obvolane:   totalObv,
-        navolane:   totalNav,
-        efektivita: totalObv > 0 ? Math.round((totalNav / totalObv) * 100) : 0,
-        totalSecs:  agents.reduce((s, a) => s + a.totalSecs, 0),
-      },
-      agents,
-    });
+    const data = await getCachedOptimcall(dateFrom, dateTo);
+    return Response.json(data, { headers: { "X-Cache": force ? "REVALIDATED" : "HIT" } });
   } catch (err) {
     return Response.json({ ok: false, error: err.message }, { status: 500 });
   }

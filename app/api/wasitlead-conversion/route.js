@@ -1,10 +1,10 @@
-import { fetchAllPages, createCache } from '@/lib/pipedrive'
+import { fetchAllPages } from '@/lib/pipedrive'
+import { cache as dataCache } from '@/lib/cache'
+
+export const dynamic = 'force-dynamic'
 
 const WASITLEAD_KEY = '75d70860fca1d25d8ed8ac4c533979b62d93e1f6'
 const WASITLEAD_YES = '805'
-const INZEROVANE    = new Set([13, 31, 34, 22])
-const CACHE_TTL     = 10 * 60 * 1000
-const cache         = createCache(CACHE_TTL)
 
 async function fetchByStatus(apiToken, status) {
   const all = await fetchAllPages(
@@ -21,7 +21,8 @@ async function fetchByStatus(apiToken, status) {
     }))
 }
 
-async function fetchData(apiToken) {
+async function fetchWasitleadData() {
+  const apiToken = process.env.PIPEDRIVE_API_TOKEN
   const [openDeals, wonDeals, lostDeals] = await Promise.all([
     fetchByStatus(apiToken, 'open'),
     fetchByStatus(apiToken, 'won'),
@@ -30,17 +31,20 @@ async function fetchData(apiToken) {
   return { deals: [...openDeals, ...wonDeals, ...lostDeals] }
 }
 
-export async function GET() {
+const getCachedWasitlead = dataCache(fetchWasitleadData, 'wasitlead-conversion', 600)
+
+export async function GET(request) {
   try {
-    const cached = cache.get()
-    if (cached !== null) {
-      return Response.json(cached, { headers: { 'X-Cache': 'HIT' } })
+    const { searchParams } = new URL(request.url)
+    const force = searchParams.get('force') === '1'
+
+    if (force) {
+      const { revalidateTag } = await import('next/cache')
+      revalidateTag('wasitlead-conversion')
     }
 
-    const apiToken = process.env.PIPEDRIVE_API_TOKEN
-    const data     = await fetchData(apiToken)
-    cache.set(data)
-    return Response.json(data, { headers: { 'X-Cache': 'MISS' } })
+    const data = await getCachedWasitlead()
+    return Response.json(data, { headers: { 'X-Cache': force ? 'REVALIDATED' : 'HIT' } })
   } catch {
     return Response.json({ error: 'Interná chyba' }, { status: 500 })
   }

@@ -1,9 +1,6 @@
-import { createCache } from '@/lib/pipedrive'
+import { cache as dataCache } from '@/lib/cache'
 
 export const dynamic = 'force-dynamic'
-
-const CACHE_TTL = 5 * 60 * 1000
-const cache     = createCache(CACHE_TTL)
 
 const NON_BROKERS = new Set([
   'development', 'api admin', 'asistent', 'kacena', 'digitaldreamers',
@@ -47,7 +44,7 @@ async function fetchAllActiveUsers(apiToken) {
   )
 }
 
-async function fetchUserWonDeals(apiToken, userId, proviziaKey) {
+async function fetchUserWonDeals(apiToken, userId) {
   const res = await fetch(
     `https://api.pipedrive.com/v1/deals/collection?api_token=${apiToken}&status=won&user_id=${userId}&limit=500`,
     { cache: 'no-store' }
@@ -56,52 +53,53 @@ async function fetchUserWonDeals(apiToken, userId, proviziaKey) {
   return json.data || []
 }
 
+async function fetchLeaderboardData() {
+  const apiToken = process.env.PIPEDRIVE_API_TOKEN
+  const [proviziaKey, users] = await Promise.all([
+    fetchProviziaFieldKey(apiToken),
+    fetchAllActiveUsers(apiToken),
+  ])
+
+  const BATCH = 10
+  const allDeals = []
+  for (let i = 0; i < users.length; i += BATCH) {
+    const batch = users.slice(i, i + BATCH)
+    const results = await Promise.allSettled(
+      batch.map(u => fetchUserWonDeals(apiToken, u.id).then(deals =>
+        deals.map(d => ({ ...d, _ownerName: u.name }))
+      ))
+    )
+    for (const r of results) {
+      if (r.status === 'fulfilled') allDeals.push(...r.value)
+    }
+  }
+
+  return allDeals.map(d => ({
+    id:           d.id,
+    title:        d.title || '',
+    owner:        d._ownerName,
+    wonTime:      d.won_time || d.close_time || null,
+    cenaVozidla:  Number(d.value) || 0,
+    currency:     d.currency || 'EUR',
+    proviziaUver: proviziaKey && d[proviziaKey] ? Number(d[proviziaKey]) : 0,
+  }))
+}
+
+const getCachedLeaderboard = dataCache(fetchLeaderboardData, 'leaderboard', 300)
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const force = searchParams.get('force') === '1'
 
-    const cached = cache.get(force)
-    if (cached !== null) {
-      return Response.json(cached, {
-        headers: { 'X-Cache': 'HIT', 'X-Cache-Age': String(cache.age()) },
-      })
+    if (force) {
+      const { revalidateTag } = await import('next/cache')
+      revalidateTag('leaderboard')
     }
 
-    const apiToken    = process.env.PIPEDRIVE_API_TOKEN
-    const [proviziaKey, users] = await Promise.all([
-      fetchProviziaFieldKey(apiToken),
-      fetchAllActiveUsers(apiToken),
-    ])
-
-    // Fetch won deals per user in parallel (batches of 10)
-    const BATCH = 10
-    const allDeals = []
-    for (let i = 0; i < users.length; i += BATCH) {
-      const batch = users.slice(i, i + BATCH)
-      const results = await Promise.allSettled(
-        batch.map(u => fetchUserWonDeals(apiToken, u.id, proviziaKey).then(deals =>
-          deals.map(d => ({ ...d, _ownerName: u.name }))
-        ))
-      )
-      for (const r of results) {
-        if (r.status === 'fulfilled') allDeals.push(...r.value)
-      }
-    }
-
-    const mapped = allDeals.map(d => ({
-      id:           d.id,
-      title:        d.title || '',
-      owner:        d._ownerName,
-      wonTime:      d.won_time || d.close_time || null,
-      cenaVozidla:  Number(d.value) || 0,
-      currency:     d.currency || 'EUR',
-      proviziaUver: proviziaKey && d[proviziaKey] ? Number(d[proviziaKey]) : 0,
-    }))
-
-    cache.set(mapped)
-    return Response.json(mapped, {
-      headers: { 'X-Cache': 'MISS', 'X-Fetched-At': new Date().toISOString() },
+    const data = await getCachedLeaderboard()
+    return Response.json(data, {
+      headers: { 'X-Cache': force ? 'REVALIDATED' : 'HIT', 'X-Fetched-At': new Date().toISOString() },
     })
   } catch (err) {
     return Response.json({ error: 'Interná chyba', detail: err?.message }, { status: 500 })

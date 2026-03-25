@@ -2,7 +2,8 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 
 // Stránky dostupné bez prihlásenia
-const PUBLIC_PAGES = ['/login', '/forgot-password', '/reset-password', '/zmena-hesla']
+// zmena-hesla je chránená stránka — vyžaduje prihlásenie
+const PUBLIC_PAGES = ['/login', '/forgot-password', '/reset-password']
 
 // API routes s vlastným auth mechanizmom (nechaj ich prejsť)
 const SKIP_API_AUTH = ['/api/webhook', '/api/snapshot']

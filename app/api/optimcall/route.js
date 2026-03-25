@@ -13,19 +13,20 @@ const NAVOLALA_KEY  = "03fcbb91323260625766779aee5b4589498069b4";
 const NAVOLANE_STAGE_IDS = [7, 17];
 
 // Pipedrive navolala option IDs that belong to telefonists (excludes webforms etc.)
-const TELEFONIST_IDS = new Set([418, 419, 420, 421, 422, 935, 426]);
+// Pipedrive returns enum option IDs as strings → store as strings
+const TELEFONIST_IDS = new Set(["418", "419", "420", "421", "422", "935", "426"]);
 
 // ── Agent registry ─────────────────────────────────────────────────────────────
 // navolalaId = Pipedrive enum option ID for the "Navolala" field
 // ext        = OptimCall extension (klapka); null if not yet assigned
 const AGENTS = [
-  { navolalaId: 418, nick: "Anička",  fullName: "Annamária Durcová",  ext: null },
-  { navolalaId: 419, nick: "Braňo",   fullName: "Braňo",              ext: null },
-  { navolalaId: 420, nick: "Daniel",  fullName: "Daniel Ondriga",      ext: null },
-  { navolalaId: 421, nick: "Kača",    fullName: "Katarína Durcová",   ext: null },
-  { navolalaId: 422, nick: "Miška",   fullName: "Michaela Knezelová", ext: null },
-  { navolalaId: 935, nick: "Patress", fullName: "Patrik Baláž",       ext: null },
-  { navolalaId: 426, nick: "Sandra",  fullName: "Sandra Lechnerová",  ext: "303" },
+  { navolalaId: "418", nick: "Anička",  fullName: "Annamária Durcová",  ext: null },
+  { navolalaId: "419", nick: "Braňo",   fullName: "Braňo",              ext: null },
+  { navolalaId: "420", nick: "Daniel",  fullName: "Daniel Ondriga",      ext: null },
+  { navolalaId: "421", nick: "Kača",    fullName: "Katarína Durcová",   ext: null },
+  { navolalaId: "422", nick: "Miška",   fullName: "Michaela Knezelová", ext: null },
+  { navolalaId: "935", nick: "Patress", fullName: "Patrik Baláž",       ext: null },
+  { navolalaId: "426", nick: "Sandra",  fullName: "Sandra Lechnerová",  ext: "303" },
 ];
 
 // Match an OptimCall srcName / src (extension) to an AGENTS entry

@@ -201,7 +201,7 @@ function LeaderboardTable({ agents }) {
     <div className="bg-white rounded-2xl shadow-sm overflow-x-auto">
       <div className="px-5 py-4 border-b border-gray-100">
         <h2 className="font-extrabold text-gray-900">📊 Prehľad výkonu</h2>
-        <p className="text-xs text-gray-400 mt-0.5">Obvolané = prepojené hovory (OptimCall) · Navolané = wasItLead yes (Pipedrive)</p>
+        <p className="text-xs text-gray-400 mt-0.5">Obvolané = prepojené hovory (OptimCall) · Navolané = dealy „Dohodnúť stretnutie" (Pipedrive)</p>
       </div>
       <table className="w-full text-sm">
         <thead>
@@ -365,8 +365,8 @@ export default function VyhodnotenieCCPage() {
             <StatCard icon="📞" label="Obvolané (prepojené)" value={data.summary.obvolane}          color="#FF501C"
               sub="Hovory so sekúndami spojenia"
             />
-            <StatCard icon="🎯" label="Navolané (leady)"   value={data.summary.navolane}          color="#22c55e"
-              sub={`${data.leadCount ?? ""} wasItLead=yes z Pipedrive`}
+            <StatCard icon="🎯" label="Navolané (stretnutia)" value={data.summary.navolane}        color="#22c55e"
+              sub={`${data.leadCount ?? ""} × Dohodnúť stretnutie (Pipedrive)`}
             />
             <StatCard icon="📊" label="Efektivita"          value={data.summary.efektivita + "%"}  color="#8b5cf6" />
             <StatCard icon="⏱️" label="Celkový čas"         value={fmtDur(data.summary.totalSecs)} color="#3b82f6"

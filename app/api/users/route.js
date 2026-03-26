@@ -75,15 +75,29 @@ export async function POST(request) {
   return Response.json({ user: { id: data.user.id, email, full_name } })
 }
 
-// PATCH /api/users — znova odošle pozvánku (pre nepotvrdených)
+// PATCH /api/users — znova odošle pozvánku ALEBO aktualizuje rolu
 export async function PATCH(request) {
   const check = await requireAdmin()
   if (check.error) return Response.json({ error: check.error }, { status: check.status })
 
-  const body  = await request.json()
-  const email = (body?.email || '').trim().toLowerCase()
+  const body = await request.json()
 
-  if (!email) return Response.json({ error: 'Chýba email' }, { status: 400 })
+  // Ak je v tele "role" + "id" → aktualizuj rolu
+  if (body?.id && body?.role) {
+    const VALID_ROLES = ['maklér', 'manažment', 'admin']
+    if (!VALID_ROLES.includes(body.role)) {
+      return Response.json({ error: 'Neplatná rola' }, { status: 400 })
+    }
+    const { error } = await supabase.auth.admin.updateUserById(body.id, {
+      user_metadata: { role: body.role },
+    })
+    if (error) return Response.json({ error: 'Rolu sa nepodarilo aktualizovať' }, { status: 400 })
+    return Response.json({ ok: true })
+  }
+
+  // Inak → znova odošli pozvánku
+  const email = (body?.email || '').trim().toLowerCase()
+  if (!email) return Response.json({ error: 'Chýba email alebo ID' }, { status: 400 })
 
   const { error } = await supabase.auth.admin.inviteUserByEmail(email, {
     redirectTo: `${APP_URL}/auth/callback?next=/reset-password`,

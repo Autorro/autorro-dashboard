@@ -86,6 +86,21 @@ export default function UsersPage() {
     setLoading(false);
   }
 
+  async function handleRoleChange(id, newRole) {
+    // Optimistická aktualizácia v UI
+    setUsers(prev => prev.map(u => u.id === id ? { ...u, role: newRole } : u));
+    const res  = await fetch("/api/users", {
+      method:  "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ id, role: newRole }),
+    });
+    const data = await res.json();
+    if (data.error) {
+      alert(data.error);
+      loadUsers(); // obnov ak zlyhalo
+    }
+  }
+
   async function handleResend(email) {
     const res  = await fetch("/api/users", {
       method:  "PATCH",
@@ -240,7 +255,23 @@ export default function UsersPage() {
                     <div className="text-gray-400 text-xs">{u.email}</div>
                   </td>
                   <td className="px-5 py-3 text-gray-600 text-xs">{u.pipedrive_name || u.full_name || "—"}</td>
-                  <td className="px-5 py-3"><RoleBadge role={u.role} /></td>
+                  <td className="px-5 py-3">
+                    <select
+                      value={u.role || "maklér"}
+                      onChange={e => handleRoleChange(u.id, e.target.value)}
+                      className={`text-xs font-medium px-2 py-1 rounded-full border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-400 ${
+                        (u.role || "maklér") === "admin"
+                          ? "bg-red-100 text-red-700"
+                          : (u.role || "maklér") === "manažment"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      <option value="maklér">Maklér</option>
+                      <option value="manažment">Manažment</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </td>
                   <td className="px-5 py-3"><Badge confirmed={u.confirmed} /></td>
                   <td className="px-5 py-3 text-gray-400 text-xs">
                     {u.last_sign_in ? new Date(u.last_sign_in).toLocaleDateString("sk") : "Nikdy"}

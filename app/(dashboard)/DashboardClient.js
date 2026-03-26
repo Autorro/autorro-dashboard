@@ -469,6 +469,7 @@ export default function DashboardClient() {
     })
       .then(r => r.json())
       .then(results => {
+        console.log('[check-listings] výsledky:', results);
         setUrlStatuses(prev => {
           const next = { ...prev };
           for (const [url, result] of Object.entries(results)) {
@@ -477,7 +478,8 @@ export default function DashboardClient() {
           return next;
         });
       })
-      .catch(() => {
+      .catch(err => {
+        console.error('[check-listings] chyba:', err);
         setUrlStatuses(prev => {
           const next = { ...prev };
           urls.forEach(u => { if (next[u] === 'loading') next[u] = 'unknown'; });

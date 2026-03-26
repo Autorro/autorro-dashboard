@@ -33,8 +33,18 @@ const ZNACKY = {
   189:'Subaru',190:'Suzuki',192:'Tesla',193:'Toyota',194:'Trabant',195:'Volga',
   196:'Volkswagen',197:'Volvo',995:'Polestar',
 }
+// Normalizácia s diakritikou → ASCII (Škoda→skoda, Citroën→citroen, ...)
+function normSlug(s) {
+  return s.toLowerCase()
+    .replace(/[šŠ]/g,'s').replace(/[čČ]/g,'c').replace(/[žŽ]/g,'z')
+    .replace(/[áÁ]/g,'a').replace(/[éÉ]/g,'e').replace(/[íÍ]/g,'i')
+    .replace(/[óÓ]/g,'o').replace(/[úÚ]/g,'u').replace(/[ä]/g,'a')
+    .replace(/[ëë]/g,'e').replace(/[üÜ]/g,'u').replace(/[öÖ]/g,'o')
+    .replace(/[ñÑ]/g,'n')
+    .replace(/[^a-z0-9]/g,'')
+}
 const ZNACKY_REV = Object.fromEntries(
-  Object.entries(ZNACKY).map(([id, name]) => [name.toLowerCase().replace(/[^a-z0-9]/g, ''), parseInt(id)])
+  Object.entries(ZNACKY).map(([id, name]) => [normSlug(name), parseInt(id)])
 )
 const PALIVO = {
   233:'Benzín+CNG',234:'Diesel',235:'Benzín+LPG',236:'LPG',237:'CNG',
@@ -100,10 +110,10 @@ function parseSlug(url) {
     const tokens = slug.toLowerCase()
     const tArr   = tokens.split(/[-_\s]+/).filter(t => t.length > 0)
 
-    // Značka — skús 1-3 tokeny
+    // Značka — skús 1-3 tokeny, normalizuj diakritiku pre porovnanie
     let znackaId = null, brandTokens = 0, brandSlug = null
     for (let n = 3; n >= 1; n--) {
-      const cand = tArr.slice(0, n).join('').replace(/[^a-z0-9]/g, '')
+      const cand = normSlug(tArr.slice(0, n).join(''))
       if (ZNACKY_REV[cand] !== undefined) {
         znackaId  = ZNACKY_REV[cand]
         brandSlug = tArr.slice(0, n).join('-')   // napr. "mercedes-benz"
@@ -143,8 +153,8 @@ function parseSlug(url) {
     const rokMatch = tokens.match(/\b(19\d{2}|20[012]\d)\b/)
     const rok      = rokMatch ? parseInt(rokMatch[1]) : null
 
-    // Výkon kW
-    const kWMatch  = tokens.match(/\b(\d{2,3})\s*kw\b/)
+    // Výkon kW — zachytí "110kw", "110 kw", "110-kw"
+    const kWMatch  = tokens.match(/\b(\d{2,3})[\s-]*kw\b/)
     const vykon    = kWMatch ? parseInt(kWMatch[1]) : null
 
     // Palivo z kódu motora
@@ -155,10 +165,10 @@ function parseSlug(url) {
     else if (/\bhybrid\b/.test(tokens))                                 palivoId = 238
     else if (/\b(bev|elektro|ev|electric)\b/.test(tokens))             palivoId = 239
 
-    // Prevodovka
+    // Prevodovka — dsg7/dsg6/dsg, xtronic, s-tronic, 7-dct, pdk, cvt, automat...
     let prevId = null
-    if      (/\b(dsg|tronic|dct|tct|pdk|cvt|tiptronic|automat)\b/.test(tokens)) prevId = 229
-    else if (/\b(manualna|manual|mechanick|mt)\b/.test(tokens))                  prevId = 228
+    if      (/\b(dsg\d?|[a-z]-?tronic\d?|dct\d?|tct\d?|pdk|cvt\d?|tiptronic|automat(icka)?)\b/.test(tokens)) prevId = 229
+    else if (/\b(manualna|manual|mechanick|6mt|5mt)\b/.test(tokens))                                           prevId = 228
 
     return { znackaId, brandName, brandSlug, modelSlug, model, rok, vykon, palivoId, prevId, isAutobazar: isAB, isBazos: isBZ }
   } catch { return null }

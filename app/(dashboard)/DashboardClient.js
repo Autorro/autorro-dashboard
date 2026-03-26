@@ -235,14 +235,15 @@ function InzerciaFazaBadge({ deal }) {
   );
 }
 
-function ListingUrlBadge({ url, urlStatuses, label }) {
+function ListingUrlBadge({ url, urlStatuses, label, checkable }) {
   if (!url) return null;
   const st = urlStatuses[url];
-  const icon = !st || st === 'loading'
-    ? <span className="opacity-40 text-xs">…</span>
-    : st === 'active'
-    ? <span className="text-green-600 font-bold">✓</span>
-    : <span className="text-red-500 font-bold">✗</span>;
+  // Vždy zobrazíme klikateľný link — status ✓/✗ sa doplní keď príde odpoveď
+  const icon = checkable
+    ? (st === 'active'   ? <span className="text-green-600 font-bold">✓</span>
+      : st === 'inactive' ? <span className="text-red-500 font-bold">✗</span>
+      : null) // žiadna ikona kým nepríde odpoveď
+    : null;
   return (
     <a
       href={url} target="_blank" rel="noopener noreferrer"
@@ -250,7 +251,7 @@ function ListingUrlBadge({ url, urlStatuses, label }) {
       onClick={e => e.stopPropagation()}
       title={url}
     >
-      {label} {icon}
+      {label}{icon ? <> {icon}</> : null}
     </a>
   );
 }
@@ -452,24 +453,20 @@ export default function DashboardClient() {
 
   useEffect(() => { loadDeals(false); }, []);
 
-  // Skontroluj URL inzerátov po načítaní dealsov
+  // Skontroluj autorro.sk URL na pozadí (autobazar.eu má bot-ochranu, len zobrazíme link)
   useEffect(() => {
     if (!deals.length) return;
-    const urls = [...new Set(
-      deals.flatMap(d => [d[AUTOBAZAR_URL_KEY], d[AUTORRO_URL_KEY]].filter(Boolean))
-    )];
-    if (!urls.length) return;
-    // Označ všetky ako "loading"
-    setUrlStatuses(Object.fromEntries(urls.map(u => [u, 'loading'])));
-    // Asynchrónne skontroluj
+    // Kontrolujeme len autorro.sk — rýchle (HEAD ~300ms), spoľahlivé
+    const autoUrls = [...new Set(deals.map(d => d[AUTORRO_URL_KEY]).filter(Boolean))];
+    if (!autoUrls.length) return;
+
     fetch('/api/check-listings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ urls }),
+      body: JSON.stringify({ urls: autoUrls }),
     })
       .then(r => r.json())
       .then(results => {
-        console.log('[check-listings] výsledky:', results);
         setUrlStatuses(prev => {
           const next = { ...prev };
           for (const [url, result] of Object.entries(results)) {
@@ -478,14 +475,7 @@ export default function DashboardClient() {
           return next;
         });
       })
-      .catch(err => {
-        console.error('[check-listings] chyba:', err);
-        setUrlStatuses(prev => {
-          const next = { ...prev };
-          urls.forEach(u => { if (next[u] === 'loading') next[u] = 'unknown'; });
-          return next;
-        });
-      });
+      .catch(() => { /* tiché zlyhanie — linky sú stále klikateľné */ });
   }, [deals]);
 
   useEffect(() => {
@@ -1242,8 +1232,8 @@ export default function DashboardClient() {
                                       </div>
                                       <div className="flex flex-wrap gap-1 mt-1">
                                         <InzerciaFazaBadge deal={d} />
-                                        <ListingUrlBadge url={d[AUTOBAZAR_URL_KEY]} urlStatuses={urlStatuses} label="AB" />
-                                        <ListingUrlBadge url={d[AUTORRO_URL_KEY]}   urlStatuses={urlStatuses} label="Auto" />
+                                        <ListingUrlBadge url={d[AUTOBAZAR_URL_KEY]} urlStatuses={urlStatuses} label="AB" checkable={false} />
+                                        <ListingUrlBadge url={d[AUTORRO_URL_KEY]}   urlStatuses={urlStatuses} label="Auto" checkable={true} />
                                       </div>
                                       <RecommendationRow deal={d} dark={dark} />
                                     </div>

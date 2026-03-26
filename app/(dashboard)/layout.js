@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: "/znacky",          icon: "🚘", label: "Značky vozidiel",          adminOnly: false },
   { href: "/konverzia",       icon: "🎯", label: "Konverzia leadov",          adminOnly: false },
   { href: "/vyhodnotenie-callcentra", icon: "📞", label: "Vyhodnotenie callcentra", adminOnly: false },
+  { href: "/kalkulacka",       icon: "🧮", label: "Kalkulačka ocenenia",      adminOnly: false },
   { href: "/users",           icon: "👥", label: "Používatelia",              adminOnly: true  },
   { href: "/zmena-hesla",     icon: "🔑", label: "Zmena hesla",              adminOnly: false },
 ];

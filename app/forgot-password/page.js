@@ -15,7 +15,7 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     setError("");
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: "https://autorro-dashboard.vercel.app/reset-password"
+      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`
     });
     if (error) {
       setError("Email nebol nájdený alebo nastala chyba");

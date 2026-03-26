@@ -8,11 +8,12 @@ function Badge({ confirmed }) {
 }
 
 export default function UsersPage() {
-  const [users,    setUsers]    = useState([]);
-  const [loading,  setLoading]  = useState(false);
-  const [fetching, setFetching] = useState(true);
-  const [message,  setMessage]  = useState("");
-  const [error,    setError]    = useState("");
+  const [users,          setUsers]          = useState([]);
+  const [pipedriveUsers, setPipedriveUsers] = useState([]);
+  const [loading,        setLoading]        = useState(false);
+  const [fetching,       setFetching]       = useState(true);
+  const [message,        setMessage]        = useState("");
+  const [error,          setError]          = useState("");
   const [form, setForm] = useState({ email: "", full_name: "", pipedrive_name: "" });
 
   async function loadUsers() {
@@ -24,7 +25,32 @@ export default function UsersPage() {
     setFetching(false);
   }
 
-  useEffect(() => { loadUsers(); }, []);
+  async function loadPipedriveUsers() {
+    const res  = await fetch("/api/pipedrive-users");
+    const data = await res.json();
+    if (!data.error) setPipedriveUsers(data.users || []);
+  }
+
+  useEffect(() => {
+    loadUsers();
+    loadPipedriveUsers();
+  }, []);
+
+  function handlePipedriveSelect(e) {
+    const userId = e.target.value;
+    if (!userId) return;
+    const pu = pipedriveUsers.find(u => String(u.id) === userId);
+    if (!pu) return;
+    // Derive email suggestion: last part of their Pipedrive email if it ends @autorro.sk,
+    // otherwise leave blank for manual entry
+    const suggestedEmail = pu.email?.endsWith("@autorro.sk") ? pu.email : "";
+    setForm(f => ({
+      ...f,
+      full_name:      pu.name,
+      pipedrive_name: pu.name,
+      email:          suggestedEmail || f.email,
+    }));
+  }
 
   async function handleCreate(e) {
     e.preventDefault();
@@ -82,6 +108,25 @@ export default function UsersPage() {
       <div className="bg-white rounded-xl shadow-sm p-6">
         <h2 className="text-lg font-semibold mb-5">Pridať nového používateľa</h2>
         <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {pipedriveUsers.length > 0 && (
+            <div className="md:col-span-2">
+              <label className="text-sm font-medium text-gray-700 block mb-1">
+                Vybrať z Pipedrive
+                <span className="text-gray-400 font-normal ml-1">(automaticky vyplní polia)</span>
+              </label>
+              <select
+                onChange={handlePipedriveSelect}
+                defaultValue=""
+                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-orange-400"
+              >
+                <option value="">— Vyber používateľa —</option>
+                {pipedriveUsers.map(u => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="md:col-span-2">
             <label className="text-sm font-medium text-gray-700 block mb-1">Email *</label>
             <input

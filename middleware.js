@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 
 // Stránky dostupné bez prihlásenia
 // zmena-hesla je chránená stránka — vyžaduje prihlásenie
-const PUBLIC_PAGES = ['/login', '/forgot-password', '/reset-password']
+const PUBLIC_PAGES = ['/login', '/forgot-password', '/reset-password', '/auth/callback']
 
 // API routes s vlastným auth mechanizmom (nechaj ich prejsť)
 const SKIP_API_AUTH = ['/api/webhook', '/api/snapshot']

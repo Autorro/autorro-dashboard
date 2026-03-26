@@ -53,7 +53,7 @@ export async function POST(request) {
 
   // Vytvor používateľa + odošli pozvánkový email s odkazom na nastavenie hesla
   const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${APP_URL}/reset-password`,
+    redirectTo: `${APP_URL}/auth/callback?next=/reset-password`,
     data: {
       full_name,
       pipedrive_name,
@@ -82,7 +82,7 @@ export async function PATCH(request) {
   if (!email) return Response.json({ error: 'Chýba email' }, { status: 400 })
 
   const { error } = await supabase.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${APP_URL}/reset-password`,
+    redirectTo: `${APP_URL}/auth/callback?next=/reset-password`,
   })
 
   if (error) return Response.json({ error: 'Nepodarilo sa znova odoslať pozvánku' }, { status: 400 })

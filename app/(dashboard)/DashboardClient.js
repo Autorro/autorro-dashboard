@@ -2,6 +2,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { EXCLUDE, CENA_KEY, ODP_AUTORRO, CENA_VOZIDLA } from "@/lib/constants";
 
+// ── Inzercia – field keys ──────────────────────────────────────────────────
+const AUTOBAZAR_URL_KEY  = '8ad28e02d445f11af2064ed71aab1aa1906db534'; // Autobazar.eu/Sauto.sk (new)
+const AUTORRO_URL_KEY    = '65230483051b78019de87ebe7ca1b8380b3e85b2'; // Autorro.sk/cz (new)
+const INZEROVANE_OD_KEY  = '3f9740a67e24bf1c3f3e65360abc0673bb07a4a8'; // Inzerované od (date)
+// const BAZOS_URL_KEY   = null; // zatiaľ nemáme pole – rezervované pre budúcnosť
+
 const CONFETTI_EMOJIS = ["🎉","🎊","⭐","✨","🌟","💥","🎈","🏆","🥇","💰","🚗"];
 const CONFETTI_COUNT  = 40;
 
@@ -204,6 +210,51 @@ const REC_STYLE = {
   ok:       { bg: "bg-green-50",   border: "border-green-200",  text: "text-green-700"  },
 };
 
+// ── Pravidlá inzercie – fázy ───────────────────────────────────────────────
+function getInzerciaDays(deal) {
+  const raw = deal[INZEROVANE_OD_KEY];
+  const start = raw
+    ? new Date(raw)
+    : new Date(new Date(deal.add_time).getTime() + 7 * 24 * 60 * 60 * 1000);
+  return Math.max(0, Math.floor((Date.now() - start) / 864e5));
+}
+
+function getInzerciaFaza(days) {
+  if (days <= 90)  return { num: 1, label: 'Fáza 1', bg: 'bg-green-100',  text: 'text-green-700'  };
+  if (days <= 180) return { num: 2, label: 'Fáza 2', bg: 'bg-orange-100', text: 'text-orange-700' };
+  return             { num: 3, label: 'Fáza 3', bg: 'bg-red-100',    text: 'text-red-700'    };
+}
+
+function InzerciaFazaBadge({ deal }) {
+  const days = getInzerciaDays(deal);
+  const faza = getInzerciaFaza(days);
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${faza.bg} ${faza.text}`}>
+      {faza.label} · {days}d
+    </span>
+  );
+}
+
+function ListingUrlBadge({ url, urlStatuses, label }) {
+  if (!url) return null;
+  const st = urlStatuses[url];
+  const icon = !st || st === 'loading'
+    ? <span className="opacity-40 text-xs">…</span>
+    : st === 'active'
+    ? <span className="text-green-600 font-bold">✓</span>
+    : <span className="text-red-500 font-bold">✗</span>;
+  return (
+    <a
+      href={url} target="_blank" rel="noopener noreferrer"
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+      onClick={e => e.stopPropagation()}
+      title={url}
+    >
+      {label} {icon}
+    </a>
+  );
+}
+
 function RecommendationRow({ deal, dark }) {
   const rec = getRecommendation(deal);
   if (rec.level === "ok" && rec.text === "V poriadku") return null; // neskrývaj ostatné OK odporúčania
@@ -348,6 +399,9 @@ export default function DashboardClient() {
   const [loadError,   setLoadError]   = useState(false);
   const [trendError,  setTrendError]  = useState(false);
 
+  // ── URL statusy inzerátov ─────────────────────────────────────
+  const [urlStatuses, setUrlStatuses] = useState({}); // { url: 'loading'|'active'|'inactive' }
+
   function loadDeals(force = false) {
     setRefreshing(true);
     fetch("/api/zdravie-ponuky" + (force ? "?force=1" : ""))
@@ -397,6 +451,40 @@ export default function DashboardClient() {
   }
 
   useEffect(() => { loadDeals(false); }, []);
+
+  // Skontroluj URL inzerátov po načítaní dealsov
+  useEffect(() => {
+    if (!deals.length) return;
+    const urls = [...new Set(
+      deals.flatMap(d => [d[AUTOBAZAR_URL_KEY], d[AUTORRO_URL_KEY]].filter(Boolean))
+    )];
+    if (!urls.length) return;
+    // Označ všetky ako "loading"
+    setUrlStatuses(Object.fromEntries(urls.map(u => [u, 'loading'])));
+    // Asynchrónne skontroluj
+    fetch('/api/check-listings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urls }),
+    })
+      .then(r => r.json())
+      .then(results => {
+        setUrlStatuses(prev => {
+          const next = { ...prev };
+          for (const [url, result] of Object.entries(results)) {
+            next[url] = result.active ? 'active' : 'inactive';
+          }
+          return next;
+        });
+      })
+      .catch(() => {
+        setUrlStatuses(prev => {
+          const next = { ...prev };
+          urls.forEach(u => { if (next[u] === 'loading') next[u] = 'unknown'; });
+          return next;
+        });
+      });
+  }, [deals]);
 
   useEffect(() => {
     if (!partyMode) {
@@ -1150,6 +1238,11 @@ export default function DashboardClient() {
                                         <KmBadge km={d._km} />
                                         {d._palivo && <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-600">{d._palivo}</span>}
                                       </div>
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        <InzerciaFazaBadge deal={d} />
+                                        <ListingUrlBadge url={d[AUTOBAZAR_URL_KEY]} urlStatuses={urlStatuses} label="AB" />
+                                        <ListingUrlBadge url={d[AUTORRO_URL_KEY]}   urlStatuses={urlStatuses} label="Auto" />
+                                      </div>
                                       <RecommendationRow deal={d} dark={dark} />
                                     </div>
                                   );
@@ -1167,6 +1260,7 @@ export default function DashboardClient() {
                                     <th className="px-3 py-2 text-left">% rozdiel</th>
                                     <th className="px-3 py-2 text-left">Cena OK</th>
                                     <th className="px-3 py-2 text-left">Predajnosť</th>
+                                    <th className="px-3 py-2 text-left">Inzercia</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -1211,10 +1305,19 @@ export default function DashboardClient() {
                                               )}
                                             </div>
                                           </td>
+                                          <td className="px-3 py-2">
+                                            <div className="flex flex-col gap-1">
+                                              <InzerciaFazaBadge deal={d} />
+                                              <div className="flex flex-wrap gap-1 mt-0.5">
+                                                <ListingUrlBadge url={d[AUTOBAZAR_URL_KEY]} urlStatuses={urlStatuses} label="AB" />
+                                                <ListingUrlBadge url={d[AUTORRO_URL_KEY]}   urlStatuses={urlStatuses} label="Auto" />
+                                              </div>
+                                            </div>
+                                          </td>
                                         </tr>
                                         {showRec && (
                                           <tr className={"border-b " + (dark ? "border-gray-700" : "border-gray-100")}>
-                                            <td colSpan={8} className={"px-3 pb-2 " + (dark ? "bg-gray-900" : "bg-gray-50")}>
+                                            <td colSpan={9} className={"px-3 pb-2 " + (dark ? "bg-gray-900" : "bg-gray-50")}>
                                               <span className={"inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold " + rs.bg + " " + rs.border + " " + rs.text}>
                                                 {rec.icon} {rec.text}
                                               </span>

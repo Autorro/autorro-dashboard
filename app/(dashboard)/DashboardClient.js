@@ -235,19 +235,23 @@ function InzerciaFazaBadge({ deal }) {
   );
 }
 
-function ListingUrlBadge({ url, urlStatuses, label, checkable }) {
+function ListingUrlBadge({ url, urlStatuses, label }) {
   if (!url) return null;
   const st = urlStatuses[url];
-  // Vždy zobrazíme klikateľný link — status ✓/✗ sa doplní keď príde odpoveď
-  const icon = checkable
-    ? (st === 'active'   ? <span className="text-green-600 font-bold">✓</span>
-      : st === 'inactive' ? <span className="text-red-500 font-bold">✗</span>
-      : null) // žiadna ikona kým nepríde odpoveď
-    : null;
+  const icon = st === 'active'
+    ? <span className="text-green-600 font-bold">✓</span>
+    : st === 'inactive'
+    ? <span className="text-red-500 font-bold">✗</span>
+    : null; // čaká na výsledok alebo ešte nebola spustená kontrola
+  const cls = st === 'active'
+    ? 'bg-green-50 text-green-700 border border-green-200'
+    : st === 'inactive'
+    ? 'bg-red-50 text-red-700 border border-red-200'
+    : 'bg-gray-100 text-gray-600';
   return (
     <a
       href={url} target="_blank" rel="noopener noreferrer"
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium hover:opacity-80 transition-colors ${cls}`}
       onClick={e => e.stopPropagation()}
       title={url}
     >
@@ -401,7 +405,9 @@ export default function DashboardClient() {
   const [trendError,  setTrendError]  = useState(false);
 
   // ── URL statusy inzerátov ─────────────────────────────────────
-  const [urlStatuses, setUrlStatuses] = useState({}); // { url: 'loading'|'active'|'inactive' }
+  const [urlStatuses,    setUrlStatuses]    = useState({}); // { url: 'active'|'inactive' }
+  const [urlCheckState,  setUrlCheckState]  = useState('idle'); // 'idle'|'checking'|'done'|'error'
+  const [urlCheckCount,  setUrlCheckCount]  = useState({ done: 0, total: 0 });
 
   function loadDeals(force = false) {
     setRefreshing(true);
@@ -453,20 +459,34 @@ export default function DashboardClient() {
 
   useEffect(() => { loadDeals(false); }, []);
 
-  // Skontroluj autorro.sk URL na pozadí (autobazar.eu má bot-ochranu, len zobrazíme link)
-  useEffect(() => {
-    if (!deals.length) return;
-    // Kontrolujeme len autorro.sk — rýchle (HEAD ~300ms), spoľahlivé
-    const autoUrls = [...new Set(deals.map(d => d[AUTORRO_URL_KEY]).filter(Boolean))];
-    if (!autoUrls.length) return;
+  // Kontrola URL inzerátov — volaná manuálne aj automaticky pri načítaní
+  async function checkListingUrls() {
+    if (!deals.length || urlCheckState === 'checking') return;
+    // Zber všetkých URL (autobazar + autorro) — kontrolujeme obe
+    const allUrls = [...new Set(
+      deals.flatMap(d => [d[AUTOBAZAR_URL_KEY], d[AUTORRO_URL_KEY]].filter(Boolean))
+    )];
+    if (!allUrls.length) { setUrlCheckState('done'); return; }
 
-    fetch('/api/check-listings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ urls: autoUrls }),
-    })
-      .then(r => r.json())
-      .then(results => {
+    setUrlCheckState('checking');
+    setUrlCheckCount({ done: 0, total: allUrls.length });
+
+    // Rozdeľ do dávok po 15 — zaistí response do 10s (Vercel limit)
+    const BATCH = 15;
+    const batches = [];
+    for (let i = 0; i < allUrls.length; i += BATCH) batches.push(allUrls.slice(i, i + BATCH));
+
+    let done = 0;
+    let hasError = false;
+    for (const batch of batches) {
+      try {
+        const res = await fetch('/api/check-listings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ urls: batch }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const results = await res.json();
         setUrlStatuses(prev => {
           const next = { ...prev };
           for (const [url, result] of Object.entries(results)) {
@@ -474,8 +494,21 @@ export default function DashboardClient() {
           }
           return next;
         });
-      })
-      .catch(() => { /* tiché zlyhanie — linky sú stále klikateľné */ });
+        done += batch.length;
+        setUrlCheckCount({ done, total: allUrls.length });
+      } catch (e) {
+        console.error('[check-listings] chyba pre dávku:', e);
+        hasError = true;
+        done += batch.length;
+        setUrlCheckCount({ done, total: allUrls.length });
+      }
+    }
+    setUrlCheckState(hasError ? 'error' : 'done');
+  }
+
+  // Auto-spusti po načítaní dealsov
+  useEffect(() => {
+    if (deals.length) checkListingUrls();
   }, [deals]);
 
   useEffect(() => {
@@ -1145,9 +1178,33 @@ export default function DashboardClient() {
           )}
 
           {/* Broker table with expandable rows */}
-          <h2 className="text-xl font-semibold mb-4">
-            {office === "Všetky" ? "Všetci makléri" : "Makléri – " + office}
-          </h2>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h2 className="text-xl font-semibold">
+              {office === "Všetky" ? "Všetci makléri" : "Makléri – " + office}
+            </h2>
+            <div className="flex items-center gap-2 text-sm">
+              {urlCheckState === 'checking' && (
+                <span className={dark ? "text-gray-400" : "text-gray-500"}>
+                  🔄 Kontrolujem URL… {urlCheckCount.done}/{urlCheckCount.total}
+                </span>
+              )}
+              {urlCheckState === 'done' && (
+                <span className="text-green-600 text-xs">
+                  ✓ URL skontrolované ({Object.values(urlStatuses).filter(v => v === 'active').length} aktívnych, {Object.values(urlStatuses).filter(v => v === 'inactive').length} neaktívnych)
+                </span>
+              )}
+              {urlCheckState === 'error' && (
+                <span className="text-orange-500 text-xs">⚠ Niektoré URL sa nepodarilo skontrolovať</span>
+              )}
+              <button
+                onClick={() => { setUrlStatuses({}); setUrlCheckState('idle'); setTimeout(checkListingUrls, 50); }}
+                disabled={urlCheckState === 'checking'}
+                className={"px-3 py-1 rounded text-xs font-medium transition-colors " + (urlCheckState === 'checking' ? "opacity-40 cursor-not-allowed " : "") + (dark ? "bg-gray-700 text-gray-200 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200")}
+              >
+                🔄 Skontrolovať URL
+              </button>
+            </div>
+          </div>
           <table className="w-full text-sm">
               <thead className={theadCls} style={theadStyle}>
                 <tr>
@@ -1232,8 +1289,8 @@ export default function DashboardClient() {
                                       </div>
                                       <div className="flex flex-wrap gap-1 mt-1">
                                         <InzerciaFazaBadge deal={d} />
-                                        <ListingUrlBadge url={d[AUTOBAZAR_URL_KEY]} urlStatuses={urlStatuses} label="AB" checkable={false} />
-                                        <ListingUrlBadge url={d[AUTORRO_URL_KEY]}   urlStatuses={urlStatuses} label="Auto" checkable={true} />
+                                        <ListingUrlBadge url={d[AUTOBAZAR_URL_KEY]} urlStatuses={urlStatuses} label="AB" />
+                                        <ListingUrlBadge url={d[AUTORRO_URL_KEY]}   urlStatuses={urlStatuses} label="Auto" />
                                       </div>
                                       <RecommendationRow deal={d} dark={dark} />
                                     </div>

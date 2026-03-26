@@ -7,6 +7,17 @@ function Badge({ confirmed }) {
     : <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Čaká na potvrdenie</span>
 }
 
+const ROLE_STYLE = {
+  "admin":     "bg-red-100 text-red-700",
+  "manažment": "bg-blue-100 text-blue-700",
+  "maklér":    "bg-gray-100 text-gray-600",
+};
+const ROLE_LABEL = { "admin": "Admin", "manažment": "Manažment", "maklér": "Maklér" };
+function RoleBadge({ role }) {
+  const r = role || "maklér";
+  return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ROLE_STYLE[r] || "bg-gray-100 text-gray-600"}`}>{ROLE_LABEL[r] || r}</span>;
+}
+
 export default function UsersPage() {
   const [users,          setUsers]          = useState([]);
   const [pipedriveUsers, setPipedriveUsers] = useState([]);
@@ -14,7 +25,7 @@ export default function UsersPage() {
   const [fetching,       setFetching]       = useState(true);
   const [message,        setMessage]        = useState("");
   const [error,          setError]          = useState("");
-  const [form, setForm] = useState({ email: "", full_name: "", pipedrive_name: "" });
+  const [form, setForm] = useState({ email: "", full_name: "", pipedrive_name: "", role: "maklér" });
 
   async function loadUsers() {
     setFetching(true);
@@ -69,7 +80,7 @@ export default function UsersPage() {
       setError(data.error);
     } else {
       setMessage(`✓ Pozvánka odoslaná na ${form.email}`);
-      setForm({ email: "", full_name: "", pipedrive_name: "" });
+      setForm({ email: "", full_name: "", pipedrive_name: "", role: "maklér" });
       loadUsers();
     }
     setLoading(false);
@@ -163,6 +174,19 @@ export default function UsersPage() {
             />
           </div>
 
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1">Rola</label>
+            <select
+              value={form.role}
+              onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
+              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+            >
+              <option value="maklér">Maklér</option>
+              <option value="manažment">Manažment</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+
           {error   && <p className="md:col-span-2 text-red-500 text-sm">{error}</p>}
           {message && <p className="md:col-span-2 text-green-600 text-sm font-medium">{message}</p>}
 
@@ -202,6 +226,7 @@ export default function UsersPage() {
               <tr>
                 <th className="px-5 py-3 text-left">Meno / Email</th>
                 <th className="px-5 py-3 text-left">Pipedrive</th>
+                <th className="px-5 py-3 text-left">Rola</th>
                 <th className="px-5 py-3 text-left">Stav</th>
                 <th className="px-5 py-3 text-left">Posledné prihlásenie</th>
                 <th className="px-5 py-3"></th>
@@ -215,6 +240,7 @@ export default function UsersPage() {
                     <div className="text-gray-400 text-xs">{u.email}</div>
                   </td>
                   <td className="px-5 py-3 text-gray-600 text-xs">{u.pipedrive_name || u.full_name || "—"}</td>
+                  <td className="px-5 py-3"><RoleBadge role={u.role} /></td>
                   <td className="px-5 py-3"><Badge confirmed={u.confirmed} /></td>
                   <td className="px-5 py-3 text-gray-400 text-xs">
                     {u.last_sign_in ? new Date(u.last_sign_in).toLocaleDateString("sk") : "Nikdy"}

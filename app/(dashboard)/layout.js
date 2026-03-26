@@ -2,18 +2,31 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { UserProvider, useUser, canSeeAll } from "../../lib/user-context";
 
 const NAV_ITEMS = [
-  { href: "/",                icon: "🏆", label: "Leaderboard predaja" },
-  { href: "/zdravie-ponuky",  icon: "🏥", label: "Zdravie ponuky" },
-  { href: "/reakčný-čas",    icon: "⚡", label: "Reakčný čas" },
-  { href: "/cas-predaja",     icon: "🕐", label: "Čas predaja" },
-  { href: "/znacky",          icon: "🚘", label: "Značky vozidiel" },
-  { href: "/konverzia",                icon: "🎯", label: "Konverzia leadov" },
-  { href: "/vyhodnotenie-callcentra", icon: "📞", label: "Vyhodnotenie callcentra" },
-  { href: "/users",                   icon: "👥", label: "Používatelia" },
-  { href: "/zmena-hesla",     icon: "🔑", label: "Zmena hesla" },
+  { href: "/",                icon: "🏆", label: "Leaderboard predaja",      adminOnly: false },
+  { href: "/zdravie-ponuky",  icon: "🏥", label: "Zdravie ponuky",           adminOnly: false },
+  { href: "/reakčný-čas",    icon: "⚡", label: "Reakčný čas",              adminOnly: false },
+  { href: "/cas-predaja",     icon: "🕐", label: "Čas predaja",              adminOnly: false },
+  { href: "/znacky",          icon: "🚘", label: "Značky vozidiel",          adminOnly: false },
+  { href: "/konverzia",       icon: "🎯", label: "Konverzia leadov",          adminOnly: false },
+  { href: "/vyhodnotenie-callcentra", icon: "📞", label: "Vyhodnotenie callcentra", adminOnly: false },
+  { href: "/users",           icon: "👥", label: "Používatelia",              adminOnly: true  },
+  { href: "/zmena-hesla",     icon: "🔑", label: "Zmena hesla",              adminOnly: false },
 ];
+
+function NavItems({ onClick }) {
+  const { role } = useUser();
+  return (
+    <>
+      {NAV_ITEMS
+        .filter(item => !item.adminOnly || role === "admin")
+        .map(item => <NavLink key={item.href} {...item} onClick={onClick} />)
+      }
+    </>
+  );
+}
 
 function NavLink({ href, icon, label, onClick }) {
   const pathname = usePathname();
@@ -65,7 +78,7 @@ function Logo() {
   );
 }
 
-export default function DashboardLayout({ children }) {
+function DashboardLayoutInner({ children }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -77,7 +90,7 @@ export default function DashboardLayout({ children }) {
           <Logo />
         </div>
         <nav className="flex flex-col gap-1 flex-1">
-          {NAV_ITEMS.map(item => <NavLink key={item.href} {...item} />)}
+          <NavItems />
         </nav>
         <LogoutButton />
       </aside>
@@ -120,9 +133,7 @@ export default function DashboardLayout({ children }) {
           </button>
         </div>
         <nav className="flex flex-col gap-1 flex-1">
-          {NAV_ITEMS.map(item => (
-            <NavLink key={item.href} {...item} onClick={() => setMenuOpen(false)} />
-          ))}
+          <NavItems onClick={() => setMenuOpen(false)} />
         </nav>
         <LogoutButton />
       </aside>
@@ -132,5 +143,14 @@ export default function DashboardLayout({ children }) {
         {children}
       </main>
     </div>
+  );
+}
+
+export default function DashboardLayout({ children }) {
+  const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "").split(",");
+  return (
+    <UserProvider adminEmails={adminEmails}>
+      <DashboardLayoutInner>{children}</DashboardLayoutInner>
+    </UserProvider>
   );
 }

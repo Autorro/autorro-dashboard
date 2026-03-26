@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useUser, canSeeAll } from "../../lib/user-context";
 
 /* ── Kancelárie ── */
 const OFFICES = {
@@ -99,6 +100,10 @@ export default function SalesLeaderboardClient() {
   const [to,       setTo]       = useState("");
   const [expanded, setExpanded] = useState(null);
 
+  /* ── Rola prihláseného používateľa ── */
+  const { role, pipedriveName } = useUser();
+  const seeAll = canSeeAll(role); // admin alebo manažment → true
+
   useEffect(()=>{
     setLoading(true);
     fetch("/api/leaderboard")
@@ -149,7 +154,7 @@ export default function SalesLeaderboardClient() {
     bMap[d.owner].totalUver+=(d.proviziaUver||0);
     bMap[d.owner].deals.push(d);
   }
-  const brokers = Object.entries(bMap)
+  const allBrokers = Object.entries(bMap)
     .map(([name,s])=>({
       name, ...s,
       avg:          s.total/s.count,
@@ -158,6 +163,11 @@ export default function SalesLeaderboardClient() {
       thisMonthUver:thisMonthUverByBroker[name]||0,
     }))
     .sort((a,b)=>b.total-a.total||b.count-a.count);
+
+  // Maklér vidí len seba (podľa pipedriveName z metadát účtu)
+  const brokers = seeAll
+    ? allBrokers
+    : allBrokers.filter(b => pipedriveName && norm(b.name) === norm(pipedriveName));
 
   const totalDeals   = brokers.reduce((s,b)=>s+b.count,0);
   const totalRevenue = brokers.reduce((s,b)=>s+b.total,0);
@@ -229,7 +239,8 @@ export default function SalesLeaderboardClient() {
         ))}
       </div>
 
-      {/* ── Banner: Financovanie (vždy zobrazený) ── */}
+      {/* ── Banner: Financovanie (len admin/manažment) ── */}
+      {seeAll &&
       <div className="rounded-2xl p-5 text-white shadow-sm"
         style={{background:"linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 60%, #2563eb 100%)"}}>
         <p className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-3">
@@ -257,6 +268,7 @@ export default function SalesLeaderboardClient() {
           </div>
         </div>
       </div>
+      }
 
       {/* ── Filtre ── */}
       <div className="bg-white rounded-2xl shadow-sm px-4 py-3">

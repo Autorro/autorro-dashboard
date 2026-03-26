@@ -29,6 +29,7 @@ export async function GET() {
     email:          u.email,
     full_name:      u.user_metadata?.full_name || '',
     pipedrive_name: u.user_metadata?.pipedrive_name || '',
+    role:           u.user_metadata?.role || 'maklér',
     confirmed:      !!u.email_confirmed_at,
     last_sign_in:   u.last_sign_in_at || null,
     created_at:     u.created_at,
@@ -46,6 +47,8 @@ export async function POST(request) {
   const email      = (body?.email      || '').trim().toLowerCase()
   const full_name  = (body?.full_name  || '').trim()
   const pipedrive_name = (body?.pipedrive_name || full_name).trim()
+  const VALID_ROLES = ['maklér', 'manažment', 'admin']
+  const role = VALID_ROLES.includes(body?.role) ? body.role : 'maklér'
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return Response.json({ error: 'Neplatný email' }, { status: 400 })
@@ -57,6 +60,7 @@ export async function POST(request) {
     data: {
       full_name,
       pipedrive_name,
+      role,
     },
   })
 

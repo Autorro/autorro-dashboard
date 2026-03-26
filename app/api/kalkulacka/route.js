@@ -274,6 +274,71 @@ const getCachedAB = (url, kw, fuel, rok) =>
     { revalidate: 7200, tags: ['autobazar'] }
   )()
 
+// ── Autobazar.eu: detail stránky → props.pageProps.advertisement ─
+// Obsahuje PRESNÉ dáta konkrétneho inzerátu (nie odhad zo 20 podobných)
+async function scrapeABDetail(url) {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent':      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'sk-SK,sk;q=0.9,cs;q=0.8',
+        'Referer':         'https://www.autobazar.eu/',
+      },
+      signal: AbortSignal.timeout(12000),
+    })
+    if (!res.ok) return null
+    const html = await res.text()
+    const nd   = html.match(/id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/)
+    if (!nd) return null
+
+    const parsed = JSON.parse(nd[1])
+
+    // 1. Priamy prístup — props.pageProps.advertisement (najspoľahlivejší)
+    const ad = parsed?.props?.pageProps?.advertisement
+    if (ad?.mileage != null || ad?.yearValue != null) {
+      return mapAdRecord(ad)
+    }
+
+    // 2. Fallback — tRPC query "record.findById" (query[0].state.data)
+    const trpc = parsed?.props?.pageProps?.trpcState?.queries || []
+    for (const q of trpc) {
+      const d = q?.state?.data
+      if (d && !Array.isArray(d) && (d.mileage != null || d.yearValue != null)) {
+        return mapAdRecord(d)
+      }
+    }
+    return null
+  } catch (e) {
+    console.error('[scrapeABDetail]', e.message)
+    return null
+  }
+}
+
+function mapAdRecord(r) {
+  return {
+    km:         r.mileage       ?? null,
+    rok:        r.yearValue     ? parseInt(r.yearValue) : null,
+    palivo:     r.fuelValue     || null,
+    palivoId:   mapAbPalivo(r.fuelValue),
+    vykon:      r.enginePower   ?? null,
+    prevodovka: r.gearboxValue  || null,
+    prevId:     mapAbGearbox(r.gearboxValue),
+    price:      r.finalPrice    || r.price || null,
+    title:      r.title         || null,
+    brand:      r.brandValue    || null,
+    model:      r.carModelValue || null,
+  }
+}
+
+// Cache 30 min pre detail stránky
+const getCachedABDetail = (url) =>
+  unstable_cache(
+    () => scrapeABDetail(url),
+    [`ab-detail-${url}`],
+    { revalidate: 1800, tags: ['autobazar-detail'] }
+  )()
+
 // ── Bazoš.sk scraping ───────────────────────────────────────────
 async function scrapeBazos(url) {
   try {
@@ -389,38 +454,37 @@ function similarity(deal, input) {
 // ── Autofill: parse URL + scrape → autofill objekt ──────────────
 async function resolveAutofill(url, hintKm, hintRok, hintPalivoId, hintPrevId, hintVykon) {
   let parsed   = null
-  let abData   = null
+  let abData   = null   // trhové dáta (20 podobných) pre pricing
+  let detail   = null   // presné dáta konkrétneho inzerátu pre autofill
   let bazos    = null
 
   if (url) {
     parsed = parseSlug(url)
 
     if (parsed?.isAutobazar) {
-      const kw   = parsed.vykon   || hintVykon
+      const kw   = parsed.vykon    || hintVykon
       const fuel = parsed.palivoId || hintPalivoId
-      const rok  = parsed.rok     || hintRok
+      const rok  = parsed.rok      || hintRok
 
-      // Priorita: search URL má kompletné dáta (mileage, yearValue, gearboxValue...)
-      const brandSef = parsed.brandSlug || AB_BRAND_SEF[parsed.znackaId]
+      // Paralelne: detail stránka (presné dáta) + search stránka (trhové dáta)
+      const brandSef  = parsed.brandSlug || AB_BRAND_SEF[parsed.znackaId]
       const searchUrl = buildABSearchUrl(brandSef, parsed.modelSlug)
 
-      if (searchUrl) {
-        abData = await getCachedAB(searchUrl, kw, fuel, rok)
-      }
-      // Fallback: detail page (môže mať podobné autá)
-      if (!abData) {
-        abData = await getCachedAB(url, kw, fuel, rok)
-      }
+      ;[detail, abData] = await Promise.all([
+        getCachedABDetail(url),
+        searchUrl ? getCachedAB(searchUrl, kw, fuel, rok) : Promise.resolve(null),
+      ])
 
-      // Dopl brand/model z autobazar.eu dát
-      if (abData?.brand && !parsed.znackaId) {
-        const k = abData.brand.toLowerCase().replace(/[^a-z0-9]/g, '')
+      // Dopl brand/model z dát ak slug nestačil
+      const brandFromData = detail?.brand || abData?.brand
+      if (brandFromData && !parsed.znackaId) {
+        const k = normSlug(brandFromData)
         if (ZNACKY_REV[k] !== undefined) {
           parsed.znackaId  = ZNACKY_REV[k]
           parsed.brandName = ZNACKY[parsed.znackaId]
         }
       }
-      if (abData?.model && !parsed.model) parsed.model = abData.model
+      if (!parsed.model) parsed.model = detail?.model || abData?.model || null
     }
 
     if (parsed?.isBazos) {
@@ -428,24 +492,26 @@ async function resolveAutofill(url, hintKm, hintRok, hintPalivoId, hintPrevId, h
     }
   }
 
-  const znackaId  = parsed?.znackaId ?? null
-  const matched   = abData?.matched
+  const znackaId = parsed?.znackaId ?? null
 
-  // Palivo + prevodovka: priorita slug (kód motora), potom mapovanie z autobazar.eu stringu
-  const palivoId = parsed?.palivoId ?? mapAbPalivo(matched?.palivo) ?? null
-  const prevId   = parsed?.prevId   ?? mapAbGearbox(matched?.prevodovka) ?? null
+  // Autofill priority:
+  //   km/rok/palivo/prevodovka/kW: detail page (presné) > bazos > slug
+  //   brand/model: detail page > slug
+  const palivoId = parsed?.palivoId ?? detail?.palivoId ?? mapAbPalivo(abData?.matched?.palivo) ?? null
+  const prevId   = parsed?.prevId   ?? detail?.prevId   ?? mapAbGearbox(abData?.matched?.prevodovka) ?? null
 
   return {
-    parsed, abData, bazos,
+    parsed, abData, detail, bazos,
     autofill: {
       znackaId,
       brandName:  znackaId ? ZNACKY[znackaId] : null,
-      model:      parsed?.model   ?? abData?.model ?? null,
-      rok:        parsed?.rok     ?? matched?.rok  ?? bazos?.rok  ?? null,
-      km:         matched?.km     ?? bazos?.km     ?? null,
+      model:      parsed?.model  ?? detail?.model ?? abData?.model ?? null,
+      // Presné dáta z konkrétneho inzerátu (detail) majú najvyššiu prioritu
+      rok:        parsed?.rok    ?? detail?.rok   ?? abData?.matched?.rok  ?? bazos?.rok   ?? null,
+      km:         detail?.km     ?? abData?.matched?.km                    ?? bazos?.km    ?? null,
       palivoId,
       prevId,
-      vykon:      parsed?.vykon   ?? matched?.vykon ?? bazos?.vykon ?? null,
+      vykon:      parsed?.vykon  ?? detail?.vykon ?? abData?.matched?.vykon ?? bazos?.vykon ?? null,
       source: url
         ? (parsed?.isAutobazar ? 'autobazar' : parsed?.isBazos ? 'bazos' : 'slug')
         : null,

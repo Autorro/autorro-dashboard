@@ -418,6 +418,10 @@ export default function DashboardClient() {
   // ── Radenie v detaile makléra ─────────────────────────────────
   const [detailSort, setDetailSort] = useState('diff'); // 'diff' | 'cena' | 'faza'
 
+  // ── PDF export ────────────────────────────────────────────────
+  const [showPdfModal, setShowPdfModal] = useState(false);
+  const [pdfPhases,   setPdfPhases]   = useState({ 1: true, 2: true, 3: true, 4: true });
+
   // ── Radenie zoznamu maklérov ──────────────────────────────────
   const [brokerSort, setBrokerSort] = useState('health'); // 'health' | 'faza3desc' | 'faza3asc'
 
@@ -540,6 +544,101 @@ export default function DashboardClient() {
   }, [trendPeriod]);
 
   function toggleExpand(name) { setExpanded(e => ({ ...e, [name]: !e[name] })); }
+
+  function handleExportPdf() {
+    const fmtM = (val, cur) => {
+      if (!val || val === 0) return '—';
+      return new Intl.NumberFormat('sk-SK', { style: 'currency', currency: cur || 'EUR', maximumFractionDigits: 0 }).format(val);
+    };
+    const fmtDays = t => t ? Math.floor((Date.now() - new Date(t)) / 864e5) + 'd' : '—';
+    const fmtYear = r => {
+      if (!r) return '';
+      if (typeof r === 'number' && r > 1900) return r;
+      const m = String(r).match(/\b(19|20)\d{2}\b/); return m ? m[0] : '';
+    };
+    const fmtKm = km => {
+      if (!km && km !== 0) return ''; const k = Number(km);
+      return isNaN(k) ? '' : k >= 1000 ? `${Math.round(k/1000)}k km` : `${k} km`;
+    };
+    const effPhase = d => {
+      const f = getInzerciaFaza(getInzerciaDays(d)).num;
+      return (f === 3 && d[CENA_KEY] != 100) ? 4 : f;
+    };
+    const phaseBadge = d => {
+      const eff = effPhase(d); const days = getInzerciaDays(d);
+      const styles = { 1:'background:#dcfce7;color:#15803d', 2:'background:#ffedd5;color:#c2410c', 3:'background:#fee2e2;color:#b91c1c', 4:'background:#f3e8ff;color:#6b21a8' };
+      return `<span style="padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;${styles[eff]}">Fáza ${eff} · ${days}d</span>`;
+    };
+    const diffBadge = (s, r) => {
+      const d = getPriceDiff(s, r);
+      if (d === null) return '—';
+      if (d > 10)  return `<span style="padding:1px 6px;border-radius:999px;font-size:10px;font-weight:700;background:#fee2e2;color:#b91c1c">+${d}% ↑</span>`;
+      if (d > 0)   return `<span style="padding:1px 6px;border-radius:999px;font-size:10px;font-weight:700;background:#fef9c3;color:#854d0e">+${d}%</span>`;
+      return `<span style="padding:1px 6px;border-radius:999px;font-size:10px;font-weight:700;background:#dcfce7;color:#15803d">${d > 0 ? '+'+d+'%' : d === 0 ? 'OK' : d+'% ↓'}</span>`;
+    };
+
+    const filtered = officeDeals.filter(d => !!pdfPhases[effPhase(d)]);
+    const byBroker = {};
+    filtered.forEach(d => { const n = d.owner_name || 'Neznámy'; if (!byBroker[n]) byBroker[n] = []; byBroker[n].push(d); });
+    const brokerEntries = Object.entries(byBroker).sort((a,b) => a[0].localeCompare(b[0]));
+    const selectedPhaseLabels = [1,2,3,4].filter(n => pdfPhases[n]).map(n => 'Fáza ' + n).join(', ');
+
+    let html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>Zdravie ponuky – ${new Date().toLocaleDateString('sk-SK')}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;font-size:11px;color:#1f2937;background:#fff}
+.hdr{padding:14px 20px;border-bottom:3px solid #FF501C;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
+.hdr h1{font-size:18px;font-weight:bold;color:#481132}
+.hdr .meta{font-size:10px;color:#6b7280;margin-top:3px}
+.broker{margin-bottom:20px;page-break-inside:avoid}
+.brow{padding:6px 10px;background:#f7f6f4;border-left:4px solid #FF501C;display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.bname{font-size:13px;font-weight:bold}
+.bstats{font-size:10px;color:#6b7280}
+table{width:100%;border-collapse:collapse;font-size:10px}
+th{background:#f7f6f4;padding:5px 7px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb}
+td{padding:4px 7px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
+tr.r4{background:#faf5ff}tr.r3{background:#fff7f7}tr.r2{background:#fffbf5}
+.mono{font-family:monospace;color:#9ca3af;font-size:10px}
+@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.broker{page-break-inside:avoid}}
+</style></head><body>
+<div class="hdr">
+  <div><h1>Autorro – Zdravie ponuky</h1>
+  <div class="meta">${office !== 'Všetky' ? 'Kancelária: '+office+' · ' : ''}Vygenerované: ${new Date().toLocaleString('sk-SK')} · ${selectedPhaseLabels}</div></div>
+  <div style="font-size:20px;font-weight:bold;color:#FF501C">${filtered.length} dealov</div>
+</div>`;
+
+    for (const [name, deals] of brokerEntries) {
+      const ok  = deals.filter(d => d[CENA_KEY] == 100).length;
+      const pct = deals.length > 0 ? Math.round((ok / deals.length) * 100) : 0;
+      const f4  = deals.filter(d => effPhase(d) === 4).length;
+      const f3  = deals.filter(d => effPhase(d) === 3).length;
+      const sorted = [...deals].sort((a, z) => { const ae=effPhase(a), ze=effPhase(z); if(ze!==ae) return ze-ae; return getInzerciaDays(z)-getInzerciaDays(a); });
+      html += `<div class="broker"><div class="brow"><span class="bname">${name}</span><span class="bstats">${deals.length} dealov · ${pct}% zdravie${f4>0?' · Fáza 4: '+f4:''}${f3>0?' · Fáza 3: '+f3:''}</span></div>
+<table><thead><tr><th>#ID</th><th>Vozidlo</th><th>Dni</th><th>Cena vozidla</th><th>Odp. cena</th><th>% rozdiel</th><th>Cena OK</th><th>Rok / km / Palivo</th><th>Fáza</th></tr></thead><tbody>`;
+      for (const d of sorted) {
+        const eff=effPhase(d), cenaOk=d[CENA_KEY]==100;
+        html += `<tr class="r${eff}">
+<td class="mono"><a href="https://autorro.pipedrive.com/deal/${d.id}" style="color:#9ca3af">#${d.id}</a></td>
+<td style="font-weight:500">${(d.title||'—').substring(0,45)}${d.title&&d.title.length>45?'…':''}</td>
+<td>${fmtDays(d.add_time)}</td>
+<td style="font-weight:500">${fmtM(d[CENA_VOZIDLA],d.currency)}</td>
+<td>${fmtM(d[ODP_AUTORRO],d.currency)}</td>
+<td>${diffBadge(d[CENA_VOZIDLA],d[ODP_AUTORRO])}</td>
+<td>${cenaOk?'<span style="color:#16a34a;font-weight:700">✓ Áno</span>':'<span style="color:#dc2626;font-weight:700">✗ Nie</span>'}</td>
+<td style="color:#6b7280">${[fmtYear(d._rok),fmtKm(d._km),d._palivo].filter(Boolean).join(' · ')||'—'}</td>
+<td>${phaseBadge(d)}</td></tr>`;
+      }
+      html += `</tbody></table></div>`;
+    }
+    html += `</body></html>`;
+
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    win.onload = () => win.print();
+    setShowPdfModal(false);
+  }
 
   const bg         = dark ? "text-white" : "text-gray-900";
   const bgStyle    = dark ? {backgroundColor: '#481132'} : {backgroundColor: '#FFFFFF'};
@@ -707,6 +806,9 @@ export default function DashboardClient() {
               className={"px-4 py-2 rounded-full text-sm font-medium transition-all " + (view === 'trend' ? "text-white" : btnBase)}
               style={view === 'trend' ? { backgroundColor: "#FF501C" } : {}}>
               📈 Trend
+            </button>
+            <button onClick={() => setShowPdfModal(true)} className={"px-4 py-2 rounded-full text-sm font-medium " + btnBase}>
+              📄 PDF
             </button>
             <button onClick={() => setDark(!dark)} className={"px-4 py-2 rounded-full text-sm font-medium " + btnBase}>
               {dark ? "☀️" : "🌙"}
@@ -1501,6 +1603,54 @@ export default function DashboardClient() {
           </>}
         </>}
       </div>
+
+      {/* PDF export modal */}
+      {showPdfModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}
+          onClick={() => setShowPdfModal(false)}>
+          <div className={"rounded-2xl shadow-2xl p-6 w-80 " + (dark ? "bg-[#3d0e2a] text-white" : "bg-white text-gray-900")}
+            onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold mb-1">Export do PDF</h3>
+            <p className={"text-xs mb-4 " + (dark ? "text-gray-400" : "text-gray-500")}>
+              Vyber fázy, ktoré chceš zahrnúť do exportu.
+            </p>
+            <div className="flex flex-col gap-2 mb-5">
+              {[
+                { num: 1, label: 'Fáza 1', color: 'bg-green-100 text-green-700' },
+                { num: 2, label: 'Fáza 2', color: 'bg-orange-100 text-orange-700' },
+                { num: 3, label: 'Fáza 3', color: 'bg-red-100 text-red-700' },
+                { num: 4, label: 'Fáza 4', color: 'bg-purple-100 text-purple-800' },
+              ].map(({ num, label, color }) => {
+                const count = officeDeals.filter(d => {
+                  const f = getInzerciaFaza(getInzerciaDays(d)).num;
+                  return ((f === 3 && d[CENA_KEY] != 100) ? 4 : f) === num;
+                }).length;
+                return (
+                  <label key={num} className="flex items-center gap-3 cursor-pointer select-none">
+                    <input type="checkbox" checked={!!pdfPhases[num]}
+                      onChange={e => setPdfPhases(p => ({ ...p, [num]: e.target.checked }))}
+                      className="w-4 h-4 accent-[#FF501C]" />
+                    <span className={"px-2 py-0.5 rounded-full text-xs font-semibold " + color}>{label}</span>
+                    <span className={"text-xs " + (dark ? "text-gray-400" : "text-gray-500")}>{count} dealov</span>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={handleExportPdf}
+                disabled={!Object.values(pdfPhases).some(Boolean)}
+                className="flex-1 py-2 rounded-lg text-sm font-bold text-white transition-opacity disabled:opacity-40"
+                style={{ backgroundColor: '#FF501C' }}>
+                Exportovať
+              </button>
+              <button onClick={() => setShowPdfModal(false)}
+                className={"py-2 px-4 rounded-lg text-sm font-medium " + (dark ? "bg-gray-700 text-gray-200" : "bg-gray-100 text-gray-700")}>
+                Zrušiť
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

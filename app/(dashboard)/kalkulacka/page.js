@@ -7,9 +7,9 @@ const fmtKm = v => (v != null && v > 0) ? v.toLocaleString("sk-SK") + " km" : "�
 export default function KalkulackaPage() {
   const dark = false;
 
-  const [enums,       setEnums]       = useState({ znacky: [], paliva: [], prevodovky: [] });
+  const [enums,       setEnums]       = useState({ znacky: [], paliva: [], prevodovky: [], pohony: [] });
   const [url,         setUrl]         = useState("");
-  const [form,        setForm]        = useState({ znackaId: "", model: "", km: "", rok: "", palivoId: "", prevId: "", vykon: "" });
+  const [form,        setForm]        = useState({ znackaId: "", model: "", km: "", rok: "", palivoId: "", prevId: "", vykon: "", pohonId: "" });
   const [autofillInfo,setAutofillInfo]= useState(null);
   const [urlLoading,  setUrlLoading]  = useState(false);
   const [loading,     setLoading]     = useState(false);
@@ -49,6 +49,7 @@ export default function KalkulackaPage() {
           if (af.palivoId) { n.palivoId = String(af.palivoId);  filled.push("Palivo"); }
           if (af.prevId)   { n.prevId   = String(af.prevId);    filled.push("Prevodovka"); }
           if (af.vykon)    { n.vykon    = String(af.vykon);     filled.push("Výkon kW"); }
+          if (af.pohonId)  { n.pohonId  = String(af.pohonId);   filled.push("Pohon"); }
           return n;
         });
         const src = af.source === "autobazar" ? "autobazar.eu" : af.source === "bazos" ? "bazoš.sk" : "URL";
@@ -73,6 +74,7 @@ export default function KalkulackaPage() {
           palivoId: form.palivoId ? parseInt(form.palivoId) : undefined,
           prevId:   form.prevId   ? parseInt(form.prevId)   : undefined,
           vykon:    form.vykon    ? parseInt(form.vykon)    : undefined,
+          pohonId:  form.pohonId  ? parseInt(form.pohonId)  : undefined,
         }),
       });
       const data = await res.json();
@@ -107,6 +109,11 @@ export default function KalkulackaPage() {
         const wAuto = AUTO_IDS.includes(input.prevId);
         const rAuto = AUTO_IDS.includes(l.prevId);
         if (wAuto !== rAuto) return false;
+      }
+      // Pohon — 4x4 vs. predný/zadný náhon
+      if (input.pohonId && l.pohonId) {
+        const is4x4 = id => id === 278;
+        if (is4x4(input.pohonId) !== is4x4(l.pohonId)) return false;
       }
       if (input.km && l.km && kmTolerance != null && Math.abs(l.km - input.km) > kmTolerance) return false;
       return true;
@@ -206,8 +213,8 @@ export default function KalkulackaPage() {
               </div>
             </div>
 
-            {/* Row 3: Palivo + Prevodovka */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Row 3: Palivo + Prevodovka + Pohon */}
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className={`block text-sm font-medium mb-1 ${lbl}`}>Palivo</label>
                 <select value={form.palivoId} onChange={e => setForm(f => ({ ...f, palivoId: e.target.value }))}
@@ -222,6 +229,14 @@ export default function KalkulackaPage() {
                   className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 ${inp}`}>
                   <option value="">Ľubovoľná</option>
                   {enums.prevodovky.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${lbl}`}>Pohon</label>
+                <select value={form.pohonId} onChange={e => setForm(f => ({ ...f, pohonId: e.target.value }))}
+                  className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 ${inp}`}>
+                  <option value="">Ľubovoľný</option>
+                  {enums.pohony.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
             </div>
@@ -249,8 +264,9 @@ export default function KalkulackaPage() {
                 {result.input?.brandName} {result.input?.model}
                 {result.input?.rok        ? ` · ${result.input.rok}` : ""}
                 {result.input?.km         ? ` · ${fmtKm(result.input.km)}` : ""}
-                {result.input?.palivo     ? ` · ${result.input.palivo}` : ""}
-                {result.input?.prevodovka ? ` · ${result.input.prevodovka}` : ""}
+                {result.input?.palivo      ? ` · ${result.input.palivo}` : ""}
+                {result.input?.prevodovka  ? ` · ${result.input.prevodovka}` : ""}
+                {result.input?.pohonLabel  ? ` · ${result.input.pohonLabel}` : ""}
               </p>
               {result.generation && (
                 <span className="text-xs bg-purple-100 text-purple-700 border border-purple-200 rounded-full px-2.5 py-0.5 font-medium">
@@ -432,6 +448,7 @@ export default function KalkulackaPage() {
                       <th className="px-4 py-3 text-right font-medium">1. evid.</th>
                       <th className="px-4 py-3 text-right font-medium">KM</th>
                       <th className="px-4 py-3 text-right font-medium hidden sm:table-cell">Prevod.</th>
+                      <th className="px-4 py-3 text-right font-medium hidden md:table-cell">Pohon</th>
                       <th className="px-4 py-3 text-right font-medium">Predané za</th>
                       <th className="px-4 py-3 text-right font-medium">Výkup</th>
                       <th className="px-4 py-3 text-left font-medium hidden md:table-cell">Maklér</th>
@@ -451,6 +468,7 @@ export default function KalkulackaPage() {
                         <td className="px-4 py-3 text-right text-gray-500">{d.evidencia || "—"}</td>
                         <td className="px-4 py-3 text-right tabular-nums text-gray-600">{fmtKm(d.km)}</td>
                         <td className="px-4 py-3 text-right hidden sm:table-cell text-gray-500">{d.prevodovka || "—"}</td>
+                        <td className="px-4 py-3 text-right hidden md:table-cell text-gray-500">{d.pohon || "—"}</td>
                         <td className="px-4 py-3 text-right tabular-nums font-medium text-orange-500">{fmt(d.predanZa)}</td>
                         <td className="px-4 py-3 text-right tabular-nums text-blue-600">{fmt(d.vykupZa)}</td>
                         <td className="px-4 py-3 hidden md:table-cell text-gray-500">{d.owner}</td>

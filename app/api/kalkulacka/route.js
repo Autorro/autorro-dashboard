@@ -17,6 +17,7 @@ const F = {
   odp_makler:  'be22b659e743dc6999971965c384c727f3b1f35b',
   provizka:    '3c229676e9af562e9df014540cc1617eccf9b0cb',
   evidencia:   'e4eb52fb66a6111543f74a35bbc6aa8eb462c3bd',
+  pohon:       '6d647f3333dc45b83fe7ebbd6b682961ea0cde75',
 }
 
 // ── Enumerácie ───────────────────────────────────────────────────
@@ -62,6 +63,12 @@ const PALIVO = {
 const PREVODOVKA = {
   223:'CVT',224:'AT/9',225:'AT/8',226:'AT/7',227:'AT/6',
   228:'Manuálna',229:'Automatická',230:'—',231:'MT/6',232:'MT/5',
+}
+const POHON = {
+  276:'Predný náhon',
+  277:'Zadný náhon',
+  278:'4x4',
+  279:'Iné',
 }
 
 // Mapovanie znackaId → autobazar.eu SEF slug pre search URL
@@ -244,6 +251,18 @@ function mapAbGearbox(s) {
   return null
 }
 
+function mapAbDrive(s) {
+  if (!s) return null
+  const d = s.toLowerCase()
+  if (d.includes('predn') || d.includes('fwd') || d.includes('front'))  return 276
+  if (d.includes('zadn')  || d.includes('rwd') || d.includes('rear'))   return 277
+  if (d.includes('4x4')   || d.includes('awd') || d.includes('4wd') ||
+      d.includes('stvor') || d.includes('all-wheel') || d.includes('allwheel') ||
+      d.includes('matic') || d.includes('quattro') || d.includes('xdrive') ||
+      d.includes('syncro')|| d.includes('4motion'))                      return 278
+  return null
+}
+
 // ── Parsovanie URL slugu ─────────────────────────────────────────
 function parseSlug(url) {
   try {
@@ -404,6 +423,8 @@ async function scrapeABPage(url, hintKw, hintFuel, hintRok, hintPrevId, yearFrom
       vykon:      r.enginePower != null ? r.enginePower         : null,
       prevodovka: r.gearboxValue || null,
       prevId:     mapAbGearbox(r.gearboxValue),
+      pohon:      r.driveValue   || null,
+      pohonId:    mapAbDrive(r.driveValue),
       brand:      r.brandValue  || null,
       model:      r.carModelValue || null,
     })).filter(r => r.price > 0)
@@ -539,6 +560,8 @@ function mapAdRecord(r) {
     vykon:      r.enginePower   ?? null,
     prevodovka: r.gearboxValue  || null,
     prevId:     mapAbGearbox(r.gearboxValue),
+    pohon:      r.driveValue    || null,
+    pohonId:    mapAbDrive(r.driveValue),
     price:      r.finalPrice    || r.price || null,
     title:      r.title         || null,
     brand:      r.brandValue    || null,
@@ -584,7 +607,7 @@ async function fetchWonDeals() {
     'id','title','owner_name','won_time',
     F.znacka, F.model, F.km, F.vykon, F.palivo, F.prevodovka,
     F.predane_za, F.vykup_za, F.odp_autorro, F.odp_makler, F.provizka,
-    F.evidencia,
+    F.evidencia, F.pohon,
   ].join(',')
   let all = [], start = 0
   while (true) {
@@ -692,6 +715,15 @@ function similarity(deal, input, gen) {
     }
   }
 
+  // ── Pohon — HARD ELIMINATE (4x4 ≠ predný náhon) ────────────────
+  const is4x4 = id => id === 278
+  if (input.pohonId && deal[F.pohon]) {
+    const dp = parseInt(deal[F.pohon])
+    // Ak jeden je 4x4 a druhý nie (alebo naopak) → vylúčiť
+    if (is4x4(input.pohonId) !== is4x4(dp)) return 0
+    if (input.pohonId === dp) score += 10
+  }
+
   // ── Výkon kW — HARD ELIMINATE > 10 kW ──────────────────────────
   if (input.vykon && deal[F.vykon]) {
     const diff = Math.abs(deal[F.vykon] - input.vykon)
@@ -787,7 +819,7 @@ async function resolveAutofill(url, hintKm, hintRok, hintPalivoId, hintPrevId, h
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { url, znackaId, model, km, rok, palivoId, prevId, vykon, autofillOnly } = body
+    const { url, znackaId, model, km, rok, palivoId, prevId, vykon, pohonId, autofillOnly } = body
 
     // 1. Parsuj URL + scrape → autofill
     const { parsed, abData: abFromUrl, bazos, autofill } =
@@ -804,6 +836,7 @@ export async function POST(request) {
       palivoId:  palivoId  ?? autofill.palivoId   ?? null,
       prevId:    prevId    ?? autofill.prevId      ?? null,
       vykon:     vykon     ?? autofill.vykon       ?? null,
+      pohonId:   pohonId   ?? autofill.pohonId     ?? null,
     }
 
     if (!inp.znackaId && !inp.model) {
@@ -878,6 +911,7 @@ export async function POST(request) {
       vykon:      d[F.vykon]      || null,
       palivo:     PALIVO[d[F.palivo]]        || null,
       prevodovka: PREVODOVKA[d[F.prevodovka]] || null,
+      pohon:      POHON[d[F.pohon]]           || null,
       predanZa:   d[F.predane_za] || null,
       vykupZa:    d[F.vykup_za]   || null,
       score:      d._score,
@@ -891,6 +925,7 @@ export async function POST(request) {
         brandName:  inp.znackaId ? ZNACKY[inp.znackaId]   : null,
         palivo:     inp.palivoId ? PALIVO[inp.palivoId]    : null,
         prevodovka: inp.prevId   ? PREVODOVKA[inp.prevId]  : null,
+        pohonLabel: inp.pohonId  ? POHON[inp.pohonId]      : null,
       },
       generation: inpGen,   // napr. { fromYear:2017, toYear:2020, name:'III FL' }
 
@@ -944,6 +979,8 @@ export async function GET() {
       .map(([id, name]) => ({ id: parseInt(id), name })),
     prevodovky: Object.entries(PREVODOVKA)
       .filter(([, n]) => n !== '—')
+      .map(([id, name]) => ({ id: parseInt(id), name })),
+    pohony:     Object.entries(POHON)
       .map(([id, name]) => ({ id: parseInt(id), name })),
   })
 }

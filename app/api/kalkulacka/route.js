@@ -330,43 +330,61 @@ function buildABSearchUrl(brandSef, modelSef, { yearFrom, yearTo, kw, kmTo } = {
   return params.length ? `${path}?${params.join('&')}` : path
 }
 
-// ── Autobazar.eu: scraping __NEXT_DATA__ z listing/search stránky ─
-async function scrapeABPage(url, hintKw, hintFuel, hintRok, hintPrevId, yearFrom, yearTo) {
+// ── Autobazar.eu: načítaj jednu stránku výsledkov → pole records ─
+async function fetchABRecords(url) {
   try {
-    const res  = await fetch(url, {
+    const res = await fetch(url, {
       headers: {
         'User-Agent':      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'sk-SK,sk;q=0.9,cs;q=0.8',
         'Referer':         'https://www.autobazar.eu/',
       },
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(14000),
     })
-    if (!res.ok) { console.error('[scrapeAB]', url, res.status); return null }
-
+    if (!res.ok) return []
     const html = await res.text()
     const nd   = html.match(/id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/)
-    if (!nd) { console.error('[scrapeAB] no __NEXT_DATA__', url); return null }
-
-    const trpc    = JSON.parse(nd[1])?.props?.pageProps?.trpcState?.queries || []
-    let records   = []
+    if (!nd) return []
+    const trpc = JSON.parse(nd[1])?.props?.pageProps?.trpcState?.queries || []
     for (const q of trpc) {
       const d = q?.state?.data
-      if (d?.data && Array.isArray(d.data) && d.data.length > 0 && d.data[0]?.price != null) {
-        records = d.data; break
-      }
+      if (d?.data && Array.isArray(d.data) && d.data.length > 0 && d.data[0]?.price != null)
+        return d.data
     }
-    if (!records.length) { console.error('[scrapeAB] no records', url); return null }
+    return []
+  } catch { return [] }
+}
 
-    const listings = records.map(r => ({
+// ── Autobazar.eu: scraping 3 stránok výsledkov naraz ─────────────
+async function scrapeABPage(url, hintKw, hintFuel, hintRok, hintPrevId, yearFrom, yearTo) {
+  try {
+    // Stránky 1–3 paralelne (page=1 je default, page=2 a page=3 pridávame)
+    const sep = url.includes('?') ? '&' : '?'
+    const [r1, r2, r3] = await Promise.all([
+      fetchABRecords(url),
+      fetchABRecords(`${url}${sep}page=2`),
+      fetchABRecords(`${url}${sep}page=3`),
+    ])
+
+    // Zlúč a deduplikuj podľa id
+    const seen = new Set()
+    const allRecords = [...r1, ...r2, ...r3].filter(r => {
+      if (!r.id || seen.has(r.id)) return false
+      seen.add(r.id); return true
+    })
+
+    if (!allRecords.length) { console.error('[scrapeAB] no records', url); return null }
+
+    const listings = allRecords.map(r => ({
       id:         r.id,
       title:      r.title || '',
       price:      r.finalPrice || r.price || 0,
-      km:         r.mileage   != null ? r.mileage   : null,
-      rok:        r.yearValue  != null ? parseInt(r.yearValue) : null,
+      km:         r.mileage    != null ? r.mileage              : null,
+      rok:        r.yearValue  != null ? parseInt(r.yearValue)  : null,
       palivo:     r.fuelValue  || null,
       palivoId:   mapAbPalivo(r.fuelValue),
-      vykon:      r.enginePower != null ? r.enginePower : null,
+      vykon:      r.enginePower != null ? r.enginePower         : null,
       prevodovka: r.gearboxValue || null,
       prevId:     mapAbGearbox(r.gearboxValue),
       brand:      r.brandValue  || null,
@@ -375,24 +393,7 @@ async function scrapeABPage(url, hintKw, hintFuel, hintRok, hintPrevId, yearFrom
 
     if (!listings.length) return null
 
-    // ── Smart match: nájdi inzerát najbližší k nášmu ─────────────
-    let bestMatch = null, bestScore = -1
-    for (const r of listings) {
-      let score = 0
-      // kW
-      if (hintKw && r.vykon != null)
-        score += Math.max(0, 40 - Math.abs(r.vykon - hintKw) * 2)
-      // palivo
-      if (hintFuel && r.palivoId === hintFuel) score += 30
-      // rok
-      if (hintRok && r.rok != null)
-        score += Math.max(0, 20 - Math.abs(r.rok - hintRok) * 4)
-
-      if (score > bestScore) { bestScore = score; bestMatch = r }
-    }
-    if (!bestMatch) bestMatch = listings[0]
-
-    // ── Strict filter: rovnaká motorizácia + prevodovka + palivo + rok ─
+    // ── Strict filter: palivo + prevodovka + rok + kW ────────────
     const fuelGroup = id => {
       if ([234, 240].includes(id))                return 'diesel'
       if ([244, 233, 235, 236, 237].includes(id)) return 'benzin'
@@ -402,26 +403,19 @@ async function scrapeABPage(url, hintKw, hintFuel, hintRok, hintPrevId, yearFrom
     }
     const AUTO_IDS = [229,224,225,226,227,223]
     const filtered = listings.filter(r => {
-      // Palivo — hard filter (rovnaká skupina, napr. diesel ≠ benzín)
       if (hintFuel && r.palivoId) {
         if (fuelGroup(r.palivoId) !== fuelGroup(hintFuel)) return false
       }
-      // Prevodovka — hard filter (auto vs. manuál)
       if (hintPrevId) {
         const wAuto = AUTO_IDS.includes(hintPrevId)
         if (r.prevId) {
-          const rAuto = AUTO_IDS.includes(r.prevId)
-          if (rAuto !== wAuto) return false
+          if (AUTO_IDS.includes(r.prevId) !== wAuto) return false
         } else {
-          // Ak prevodovka inzerátu nie je detekovaná, skús parsovať z titulku
           const t = (r.title || '').toLowerCase()
-          const titleAuto = /automat|dsg|s-tronic|7g|8g|tiptronic|pdk|cvt/.test(t)
-          const titleMan  = /manu[aá]|manual/.test(t)
-          if (wAuto && titleMan)  return false
-          if (!wAuto && titleAuto) return false
+          if (wAuto  && /manu[aá]|manual/.test(t))              return false
+          if (!wAuto && /automat|dsg|s-tronic|tiptronic|pdk|cvt/.test(t)) return false
         }
       }
-      // Rok — v rámci generácie (±1r) alebo ±2 roky ak nemáme generáciu
       if (r.rok) {
         if (yearFrom && yearTo) {
           if (r.rok < yearFrom - 1 || r.rok > yearTo + 1) return false
@@ -429,22 +423,30 @@ async function scrapeABPage(url, hintKw, hintFuel, hintRok, hintPrevId, yearFrom
           if (Math.abs(r.rok - hintRok) > 2) return false
         }
       }
-      // kW — hard filter ±10 kW (rovnaká motorizácia, napr. 110 ≠ 85)
-      if (hintKw && r.vykon) {
-        if (Math.abs(r.vykon - hintKw) > 10) return false
-      }
+      if (hintKw && r.vykon && Math.abs(r.vykon - hintKw) > 10) return false
       return true
     })
 
+    // bestMatch pre autofill (najlepší z filtrovaných alebo všetkých)
+    const pool = filtered.length ? filtered : listings
+    let bestMatch = pool[0], bestScore = -1
+    for (const r of pool) {
+      let score = 0
+      if (hintKw  && r.vykon != null) score += Math.max(0, 40 - Math.abs(r.vykon - hintKw) * 2)
+      if (hintFuel && r.palivoId === hintFuel) score += 30
+      if (hintRok  && r.rok != null)  score += Math.max(0, 20 - Math.abs(r.rok - hintRok) * 4)
+      if (score > bestScore) { bestScore = score; bestMatch = r }
+    }
+
     return {
-      brand:             records[0]?.brandValue     || null,
-      model:             records[0]?.carModelValue  || null,
-      matched:           bestMatch,
-      listings:          listings.slice(0, 20),
-      filteredListings:  filtered.slice(0, 20),   // len zodpovedajúce inzeráty
-      stats:             calcStats(listings.map(r => r.price)),
-      filteredStats:     calcStats(filtered.map(r => r.price)),
-      filteredCount:     filtered.length,
+      brand:            allRecords[0]?.brandValue    || null,
+      model:            allRecords[0]?.carModelValue || null,
+      matched:          bestMatch,
+      listings:         listings.slice(0, 60),
+      filteredListings: filtered.slice(0, 60),
+      stats:            calcStats(listings.map(r => r.price)),
+      filteredStats:    calcStats(filtered.map(r => r.price)),
+      filteredCount:    filtered.length,
     }
   } catch (e) {
     console.error('[scrapeABPage]', url, e.message)

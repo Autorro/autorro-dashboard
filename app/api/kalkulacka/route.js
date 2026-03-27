@@ -301,6 +301,7 @@ function parseSlug(url) {
       'dsg','pdk','cvt','tronic','tiptronic','dct','tct',     // prevodovka
       'at','mt','awd','4wd','4x4','fwd','rwd',                // pohon/prevod
     ])
+    // Striktný filter pre 2.+ model token
     const isSpecToken = t =>
       SPEC.has(t)               ||
       /^(19|20)\d{2}$/.test(t) ||   // rok
@@ -308,15 +309,21 @@ function parseSlug(url) {
       /^\d+kw$/.test(t)        ||   // "110kw"
       /^[a-z]{1,3}\d+/.test(t)      // ID ako "lx30k", "ab123", "rs3", "c220"
 
-    // Jednopísmenové modely (E, A, C, S, X trieda) povolíme len ako PRVÝ token
+    // Miernejší filter pre PRVÝ model token — povolí alfanumerické modely
+    // ako a6, q7, x3, rs6, glc, 320d, x5, a4, a3 atď.
+    const isSpecTokenFirst = t =>
+      SPEC.has(t)               ||
+      /^(19|20)\d{2}$/.test(t) ||   // 4-ciferný rok
+      /^\d+kw$/.test(t)             // "110kw"
+
     const modelTokens = []
     for (let i = brandTokens; i < tArr.length; i++) {
       const t = tArr[i]
-      if (isSpecToken(t)) break
       const isFirst = modelTokens.length === 0
-      // Jednopísmenový token povolíme len na začiatku (napr. "e" v e-trieda)
+      // Pre prvý token buď miernejší (a6, q7, x3, rs6, 3, 5 ...)
+      if (isFirst ? isSpecTokenFirst(t) : isSpecToken(t)) break
+      // Jednopísmenový token povolíme len na prvej pozícii (napr. "e" v e-trieda)
       if (t.length === 1 && !isFirst) break
-      if (t.length === 1 && isFirst && !/^[a-z]$/.test(t)) break
       modelTokens.push(t)
       if (modelTokens.length >= 3) break
     }
@@ -496,7 +503,7 @@ async function scrapeABPage(url, hintKw, hintFuel, hintRok, hintPrevId, yearFrom
 const getCachedAB = (url, kw, fuel, rok, prevId, yearFrom, yearTo) =>
   unstable_cache(
     () => scrapeABPage(url, kw, fuel, rok, prevId, yearFrom, yearTo),
-    [`ab11-${url}-${kw}-${fuel}-${rok}-${prevId}-${yearFrom}-${yearTo}`],
+    [`ab12-${url}-${kw}-${fuel}-${rok}-${prevId}-${yearFrom}-${yearTo}`],
     { revalidate: 7200, tags: ['autobazar'] }
   )()
 
@@ -856,9 +863,12 @@ export async function POST(request) {
       : null
 
     // 4. Autobazar.eu trhové dáta
-    // Ak URL nebola zadaná (manuálny vstup), skúsime nájsť trhové dáta sami
+    // Prípad A: URL vstup — abFromUrl bol načítaný v resolveAutofill
+    // Prípad B: Manuálny vstup alebo abFromUrl načítaný bez model slugu
+    //           (parseSlug nevedel extrahovať model z URL) → načítaj znovu s modelom
     let abMarket = abFromUrl
-    if (!abMarket && inp.znackaId) {
+    const parsedHadNoModel = !parsed?.modelSlug && !!inpModelSef
+    if ((!abMarket || parsedHadNoModel) && inp.znackaId) {
       const searchUrl = buildABSearchUrl(inpBrandSef, inpModelSef, {
         yearFrom: inpGen?.fromYear, yearTo: inpGen?.toYear,
         kw:     inp.vykon,

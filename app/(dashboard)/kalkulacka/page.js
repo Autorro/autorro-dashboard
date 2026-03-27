@@ -86,6 +86,31 @@ export default function KalkulackaPage() {
   const inp  = "bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:ring-orange-400";
   const lbl  = "text-gray-700";
 
+  // Pomocné funkcie pre client-side filtrovanie trhových inzerátov
+  const fuelGroup = id => {
+    if ([234, 240].includes(id))                return "diesel";
+    if ([244, 233, 235, 236, 237].includes(id)) return "benzin";
+    if ([238, 241].includes(id))                return "hybrid";
+    if ([239].includes(id))                     return "elektro";
+    return "other";
+  };
+  const AUTO_IDS = [229, 224, 225, 226, 227, 223];
+
+  // Filtruje inzeráty podľa rovnakej motorizácie (±10 kW), paliva a prevodovky
+  function filterListings(listings, input) {
+    if (!listings?.length || !input) return listings || [];
+    return listings.filter(l => {
+      if (input.vykon && l.vykon && Math.abs(l.vykon - input.vykon) > 10) return false;
+      if (input.palivoId && l.palivoId && fuelGroup(l.palivoId) !== fuelGroup(input.palivoId)) return false;
+      if (input.prevId && l.prevId) {
+        const wAuto = AUTO_IDS.includes(input.prevId);
+        const rAuto = AUTO_IDS.includes(l.prevId);
+        if (wAuto !== rAuto) return false;
+      }
+      return true;
+    });
+  }
+
   // Zisti čo zobrazíme ako hlavné odporúčané ceny
   const rec       = result?.recommended;
   const mktStats  = result?.market?.filteredStats || result?.market?.stats;
@@ -302,28 +327,35 @@ export default function KalkulackaPage() {
 
           {/* ── Trhové ceny autobazar.eu ── */}
           {result.market?.listings?.length > 0 && (() => {
-            // Preferuj striktne filtrované výsledky; ak nie sú, ukáž aspoň surové
-            const hasFiltered = result.market.filteredListings?.length > 0;
-            const rows = hasFiltered ? result.market.filteredListings : result.market.listings;
-            const isFiltered = hasFiltered;
+            const allRows      = result.market.listings;
+            const filteredRows = filterListings(allRows, result.input);
+            const rows         = filteredRows.length > 0 ? filteredRows : allRows;
+            const isFiltered   = filteredRows.length > 0 && filteredRows.length < allRows.length;
+
+            // Vypočítaj medián filtrovaných cien priamo v UI
+            const prices    = filteredRows.map(l => l.price).filter(Boolean).sort((a, b) => a - b);
+            const n         = prices.length;
+            const median    = n > 0 ? (n % 2 === 0 ? Math.round((prices[n/2-1]+prices[n/2])/2) : prices[Math.floor(n/2)]) : null;
+            const priceMin  = n > 0 ? prices[0] : null;
+            const priceMax  = n > 0 ? prices[n-1] : null;
+            const displayStats = isFiltered && median ? { median, min: priceMin, max: priceMax } : result.market.filteredStats || result.market.stats;
+
             return (
               <div className={`rounded-xl shadow-sm overflow-hidden ${card}`}>
                 <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                   <div>
-                    <h2 className="font-semibold text-gray-900">
-                      📊 Aktuálny trh — Autobazar.eu
-                    </h2>
+                    <h2 className="font-semibold text-gray-900">📊 Aktuálny trh — Autobazar.eu</h2>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {isFiltered
-                        ? `${result.market.filteredCount} zodpovedajúcich inzerátov (z ${result.market.stats?.n} celkom) · rovnaká motorizácia + prevodovka + palivo${result.generation ? ` · gen. ${result.generation.name}` : ""}`
-                        : `${result.market.stats?.n} inzerátov celkom`}
+                        ? `${filteredRows.length} zodpovedajúcich z ${allRows.length} inzerátov · rovnaká motorizácia + prevodovka + palivo${result.generation ? ` · gen. ${result.generation.name}` : ""}`
+                        : `${allRows.length} inzerátov${result.input?.vykon || result.input?.palivoId ? " (filtrovanie nenašlo zhodu, zobrazujem všetky)" : " celkom"}`}
                     </p>
                   </div>
-                  {result.market.filteredStats && (
+                  {displayStats?.median && (
                     <div className="text-right">
-                      <p className="text-xs text-gray-400">Medián</p>
-                      <p className="text-lg font-bold text-yellow-600">{fmt(result.market.filteredStats.median)}</p>
-                      <p className="text-xs text-gray-400">{fmt(result.market.filteredStats.min)} – {fmt(result.market.filteredStats.max)}</p>
+                      <p className="text-xs text-gray-400">Medián {isFiltered ? "(filtrované)" : ""}</p>
+                      <p className="text-lg font-bold text-yellow-600">{fmt(displayStats.median)}</p>
+                      <p className="text-xs text-gray-400">{fmt(displayStats.min)} – {fmt(displayStats.max)}</p>
                     </div>
                   )}
                 </div>

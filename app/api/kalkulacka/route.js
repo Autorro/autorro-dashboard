@@ -70,6 +70,147 @@ const AB_BRAND_SEF = {
   197:'volvo',995:'polestar',
 }
 
+// ── Generation database ──────────────────────────────────────────
+// Format: [fromYear, fromMonth|null, toYear, toMonth|null, genName]
+// month: 1=Jan … 12=Dec, null = celý rok
+const GENERATIONS = {
+  'skoda-octavia': [
+    [1996,null,2000,null,'I'],[2000,null,2004,null,'I FL'],
+    [2004,null,2008,null,'II'],[2008,null,2013,null,'II FL'],
+    [2013,null,2017,6,'III'],[2017,7,2020,null,'III FL'],[2020,null,2035,null,'IV'],
+  ],
+  'skoda-fabia': [
+    [1999,null,2004,null,'I'],[2004,null,2007,null,'I FL'],
+    [2007,null,2010,null,'II'],[2010,null,2014,null,'II FL'],
+    [2014,null,2018,null,'III'],[2018,null,2021,null,'III FL'],[2021,null,2035,null,'IV'],
+  ],
+  'skoda-superb': [
+    [2001,null,2008,null,'I'],
+    [2008,null,2013,null,'II'],[2013,null,2015,null,'II FL'],
+    [2015,null,2019,null,'III'],[2019,null,2023,null,'III FL'],[2023,null,2035,null,'IV'],
+  ],
+  'skoda-rapid':  [[2012,null,2017,null,'I'],[2017,null,2019,null,'I FL'],[2019,null,2035,null,'II']],
+  'skoda-scala':  [[2018,null,2035,null,'I']],
+  'skoda-kodiaq': [[2016,null,2021,null,'I'],[2021,null,2023,null,'I FL'],[2023,null,2035,null,'II']],
+  'skoda-karoq':  [[2017,null,2021,null,'I'],[2021,null,2035,null,'I FL']],
+  'skoda-kamiq':  [[2019,null,2035,null,'I']],
+  'skoda-yeti':   [[2009,null,2013,null,'I'],[2013,null,2017,null,'I FL']],
+  'volkswagen-golf': [
+    [2008,null,2012,null,'VI'],
+    [2012,null,2017,6,'VII'],[2017,7,2019,null,'VII FL'],[2019,null,2035,null,'VIII'],
+  ],
+  'volkswagen-polo':   [[2009,null,2014,null,'V (6R)'],[2014,null,2017,null,'V FL (6C)'],[2017,null,2035,null,'VI']],
+  'volkswagen-passat': [[2005,null,2010,null,'B6'],[2010,null,2014,null,'B7'],[2014,null,2019,null,'B8'],[2019,null,2035,null,'B8 FL']],
+  'volkswagen-tiguan': [[2007,null,2011,null,'I'],[2011,null,2016,null,'I FL'],[2016,null,2020,null,'II'],[2020,null,2035,null,'II FL']],
+  'volkswagen-touran': [[2003,null,2006,null,'I'],[2006,null,2015,null,'I FL'],[2015,null,2019,null,'II'],[2019,null,2035,null,'II FL']],
+  'volkswagen-t-roc':  [[2017,null,2021,null,'I'],[2021,null,2035,null,'I FL']],
+  'audi-a3': [
+    [2003,null,2008,null,'8P'],[2008,null,2012,null,'8P FL'],
+    [2012,null,2016,null,'8V'],[2016,null,2020,null,'8V FL'],[2020,null,2035,null,'8Y'],
+  ],
+  'audi-a4': [[2007,null,2011,null,'B8'],[2011,null,2015,null,'B8 FL'],[2015,null,2019,null,'B9'],[2019,null,2035,null,'B9 FL']],
+  'audi-a5': [[2007,null,2011,null,'8T'],[2011,null,2016,null,'8T FL'],[2016,null,2020,null,'F5'],[2020,null,2035,null,'F5 FL']],
+  'audi-a6': [[2004,null,2008,null,'C6'],[2008,null,2011,null,'C6 FL'],[2011,null,2014,null,'C7'],[2014,null,2018,null,'C7 FL'],[2018,null,2035,null,'C8']],
+  'audi-q3': [[2011,null,2014,null,'8U'],[2014,null,2018,null,'8U FL'],[2018,null,2035,null,'F3']],
+  'audi-q5': [[2008,null,2012,null,'8R'],[2012,null,2017,null,'8R FL'],[2017,null,2035,null,'FY']],
+  'audi-q7': [[2006,null,2009,null,'4L'],[2009,null,2015,null,'4L FL'],[2015,null,2035,null,'4M']],
+  'bmw-1': [
+    [2004,null,2007,null,'E87'],[2007,null,2011,null,'E87 FL'],
+    [2011,null,2015,null,'F20'],[2015,null,2019,null,'F20 FL'],[2019,null,2035,null,'F40'],
+  ],
+  'bmw-3': [
+    [2005,null,2008,null,'E90'],[2008,null,2012,null,'E90 FL'],
+    [2012,null,2015,null,'F30'],[2015,null,2019,null,'F30 FL'],[2019,null,2035,null,'G20'],
+  ],
+  'bmw-5': [
+    [2003,null,2007,null,'E60'],[2007,null,2010,null,'E60 FL'],
+    [2010,null,2013,null,'F10'],[2013,null,2017,null,'F10 FL'],[2017,null,2035,null,'G30'],
+  ],
+  'bmw-x1': [[2009,null,2012,null,'E84'],[2012,null,2015,null,'E84 FL'],[2015,null,2019,null,'F48'],[2019,null,2022,null,'F48 FL'],[2022,null,2035,null,'U11']],
+  'bmw-x3': [[2003,null,2010,null,'E83'],[2010,null,2017,null,'F25'],[2017,null,2035,null,'G01']],
+  'bmw-x5': [[2000,null,2006,null,'E53'],[2006,null,2013,null,'E70'],[2013,null,2018,null,'F15'],[2018,null,2035,null,'G05']],
+  'mercedes-benz-a': [
+    [2004,null,2008,null,'W169'],[2008,null,2012,null,'W169 FL'],
+    [2012,null,2015,null,'W176'],[2015,null,2018,null,'W176 FL'],[2018,null,2035,null,'W177'],
+  ],
+  'mercedes-benz-c': [
+    [2000,null,2004,null,'W203'],[2004,null,2007,null,'W203 FL'],
+    [2007,null,2011,null,'W204'],[2011,null,2014,null,'W204 FL'],
+    [2014,null,2018,null,'W205'],[2018,null,2021,null,'W205 FL'],[2021,null,2035,null,'W206'],
+  ],
+  'mercedes-benz-e': [
+    [2002,null,2006,null,'W211'],[2006,null,2009,null,'W211 FL'],
+    [2009,null,2013,null,'W212'],[2013,null,2016,null,'W212 FL'],
+    [2016,null,2020,null,'W213'],[2020,null,2035,null,'W213 FL'],
+  ],
+  'mercedes-benz-glc': [[2015,null,2019,null,'X253'],[2019,null,2022,null,'X253 FL'],[2022,null,2035,null,'X254']],
+  'ford-focus':  [[2004,null,2007,null,'II'],[2007,null,2011,null,'II FL'],[2011,null,2014,null,'III'],[2014,null,2018,null,'III FL'],[2018,null,2035,null,'IV']],
+  'ford-fiesta': [[2008,null,2012,null,'VI'],[2012,null,2017,null,'VI FL'],[2017,null,2035,null,'VII']],
+  'ford-kuga':   [[2008,null,2012,null,'I'],[2012,null,2019,null,'II'],[2019,null,2035,null,'III']],
+  'ford-mondeo': [[2007,null,2011,null,'IV'],[2011,null,2014,null,'IV FL'],[2014,null,2022,null,'V']],
+  'opel-astra': [
+    [2004,null,2007,null,'H'],[2007,null,2010,null,'H FL'],
+    [2009,null,2012,null,'J'],[2012,null,2015,null,'J FL'],
+    [2015,null,2019,null,'K'],[2019,null,2021,null,'K FL'],[2021,null,2035,null,'L'],
+  ],
+  'opel-insignia': [[2008,null,2013,null,'A'],[2013,null,2017,null,'A FL'],[2017,null,2035,null,'B']],
+  'opel-corsa':    [[2006,null,2011,null,'D'],[2011,null,2014,null,'D FL'],[2014,null,2019,null,'E'],[2019,null,2035,null,'F']],
+  'opel-mokka':    [[2012,null,2016,null,'A'],[2016,null,2020,null,'A FL'],[2020,null,2035,null,'B']],
+  'renault-megane': [[2008,null,2012,null,'III'],[2012,null,2016,null,'III FL'],[2016,null,2020,null,'IV'],[2020,null,2035,null,'IV FL']],
+  'renault-clio':   [[2005,null,2009,null,'III'],[2009,null,2012,null,'III FL'],[2012,null,2016,null,'IV'],[2016,null,2019,null,'IV FL'],[2019,null,2035,null,'V']],
+  'renault-kadjar': [[2015,null,2019,null,'I'],[2019,null,2035,null,'I FL']],
+  'renault-captur': [[2013,null,2017,null,'I'],[2017,null,2019,null,'I FL'],[2019,null,2035,null,'II']],
+  'peugeot-308':  [[2007,null,2011,null,'I'],[2011,null,2013,null,'I FL'],[2013,null,2017,null,'II'],[2017,null,2021,null,'II FL'],[2021,null,2035,null,'III']],
+  'peugeot-3008': [[2008,null,2013,null,'I'],[2013,null,2016,null,'I FL'],[2016,null,2020,null,'II'],[2020,null,2035,null,'II FL']],
+  'peugeot-208':  [[2012,null,2015,null,'I'],[2015,null,2019,null,'I FL'],[2019,null,2035,null,'II']],
+  'toyota-yaris':   [[2005,null,2011,null,'II'],[2011,null,2014,null,'III'],[2014,null,2020,null,'III FL'],[2020,null,2035,null,'IV']],
+  'toyota-corolla': [[2007,null,2013,null,'X (E140)'],[2013,null,2019,null,'XI (E170)'],[2019,null,2035,null,'XII (E210)']],
+  'toyota-rav4':    [[2005,null,2013,null,'III'],[2013,null,2018,null,'IV'],[2018,null,2035,null,'V']],
+  'hyundai-i30':    [[2007,null,2012,null,'I'],[2012,null,2017,null,'II'],[2017,null,2020,null,'III'],[2020,null,2035,null,'III FL']],
+  'hyundai-tucson': [[2004,null,2010,null,'I (JM)'],[2015,null,2018,null,'III'],[2018,null,2020,null,'III FL'],[2020,null,2035,null,'IV']],
+  'kia-ceed':     [[2007,null,2012,null,'I'],[2012,null,2018,null,'II'],[2018,null,2035,null,'III']],
+  'kia-sportage': [[2004,null,2010,null,'II'],[2010,null,2016,null,'III'],[2016,null,2021,null,'IV'],[2021,null,2035,null,'V']],
+  'mazda-3':    [[2003,null,2009,null,'I (BK)'],[2009,null,2013,null,'II (BL)'],[2013,null,2019,null,'III (BM)'],[2019,null,2035,null,'IV (BP)']],
+  'mazda-cx-5': [[2012,null,2017,null,'I'],[2017,null,2023,null,'II'],[2023,null,2035,null,'II FL']],
+  'mazda-cx':   [[2012,null,2017,null,'I'],[2017,null,2023,null,'II'],[2023,null,2035,null,'II FL']],
+  'honda-civic':     [[2005,null,2011,null,'VIII'],[2011,null,2015,null,'IX'],[2015,null,2021,null,'X'],[2021,null,2035,null,'XI']],
+  'nissan-qashqai':  [[2006,null,2013,null,'I'],[2013,null,2021,null,'II'],[2021,null,2035,null,'III']],
+  'seat-leon':   [[2005,null,2012,null,'II (1P)'],[2012,null,2017,null,'III (5F)'],[2017,null,2020,null,'III FL'],[2020,null,2035,null,'IV (KL1)']],
+  'seat-ibiza':  [[2008,null,2017,null,'IV (6J)'],[2017,null,2035,null,'V (KJ1)']],
+  'seat-ateca':  [[2016,null,2020,null,'I'],[2020,null,2035,null,'I FL']],
+  'citroen-c3':  [[2009,null,2013,null,'II'],[2013,null,2016,null,'II FL'],[2016,null,2020,null,'III'],[2020,null,2035,null,'III FL']],
+  'citroen-c4':  [[2004,null,2010,null,'I'],[2010,null,2015,null,'II'],[2015,null,2021,null,'II FL'],[2021,null,2035,null,'III']],
+  'dacia-duster':  [[2010,null,2013,null,'I'],[2013,null,2017,null,'I FL'],[2017,null,2021,null,'II'],[2021,null,2035,null,'II FL']],
+  'dacia-sandero': [[2008,null,2012,null,'I'],[2012,null,2020,null,'II'],[2020,null,2035,null,'III']],
+  'mitsubishi-outlander': [[2006,null,2012,null,'II'],[2012,null,2015,null,'III'],[2015,null,2021,null,'III FL'],[2021,null,2035,null,'IV']],
+  'suzuki-vitara': [[2015,null,2018,null,'IV'],[2018,null,2035,null,'IV FL']],
+  'suzuki-swift':  [[2005,null,2010,null,'III'],[2010,null,2017,null,'IV'],[2017,null,2035,null,'V']],
+}
+
+// Nájdi generáciu pre daný model, rok a (voliteľne) mesiac
+function findGeneration(brandSef, modelSef, rok, month) {
+  if (!brandSef || !rok) return null
+  const mTokens = (modelSef || '').split('-').filter(Boolean)
+  // Skús kľúče od dlhšieho (cx-5) po kratší (cx)
+  const candidates = []
+  if (mTokens.length >= 2) candidates.push(`${brandSef}-${mTokens.slice(0, 2).join('-')}`)
+  if (mTokens.length >= 1) candidates.push(`${brandSef}-${mTokens[0]}`)
+  let gens = null
+  for (const key of candidates) {
+    if (GENERATIONS[key]) { gens = GENERATIONS[key]; break }
+  }
+  if (!gens) return null
+  const ym = rok * 12 + (month || 6)   // null mesiac → predpokladáme jún
+  for (const [fy, fm, ty, tm, name] of gens) {
+    const from = fy * 12 + (fm || 1)
+    const to   = ty * 12 + (tm || 12)
+    if (ym >= from && ym <= to) {
+      return { fromYear: fy, fromMonth: fm || 1, toYear: ty, toMonth: tm || 12, name }
+    }
+  }
+  return null
+}
+
 // ── Mappery: autobazar.eu string → naše enum ID ──────────────────
 function mapAbPalivo(s) {
   if (!s) return null
@@ -176,14 +317,18 @@ function parseSlug(url) {
 
 // ── Autobazar.eu search URL ──────────────────────────────────────
 // Správna URL schéma: /vysledky/osobne-vozidla/{brandSef}/{modelSef}/
-function buildABSearchUrl(brandSef, modelSef) {
+function buildABSearchUrl(brandSef, modelSef, yearFrom, yearTo) {
   if (!brandSef) return null
   const base = `https://www.autobazar.eu/vysledky/osobne-vozidla/${brandSef}/`
-  return modelSef ? `${base}${modelSef}/` : base
+  const path = modelSef ? `${base}${modelSef}/` : base
+  const params = []
+  if (yearFrom) params.push(`yearFrom=${yearFrom}`)
+  if (yearTo)   params.push(`yearTo=${yearTo}`)
+  return params.length ? `${path}?${params.join('&')}` : path
 }
 
 // ── Autobazar.eu: scraping __NEXT_DATA__ z listing/search stránky ─
-async function scrapeABPage(url, hintKw, hintFuel, hintRok) {
+async function scrapeABPage(url, hintKw, hintFuel, hintRok, hintPrevId, yearFrom, yearTo) {
   try {
     const res  = await fetch(url, {
       headers: {
@@ -244,11 +389,39 @@ async function scrapeABPage(url, hintKw, hintFuel, hintRok) {
     }
     if (!bestMatch) bestMatch = listings[0]
 
-    // ── Filtered stats: relevantné inzeráty pre daný rok + palivo ─
+    // ── Filtered stats: generácia + palivo + prevodovka + kW ─────
+    const fuelGroup = id => {
+      if ([234, 240].includes(id))           return 'diesel'
+      if ([244, 233, 235, 236, 237].includes(id)) return 'benzin'
+      if ([238, 241].includes(id))           return 'hybrid'
+      if ([239].includes(id))                return 'elektro'
+      return 'other'
+    }
+    const AUTO_IDS = [229,224,225,226,227,223]
     const filtered = listings.filter(r => {
-      const rokOk  = !hintRok  || !r.rok      || Math.abs(r.rok - hintRok) <= 2
-      const fuelOk = !hintFuel || !r.palivoId || r.palivoId === hintFuel
-      return rokOk && fuelOk
+      // Palivo — hard filter (rovnaká skupina)
+      if (hintFuel && r.palivoId) {
+        if (fuelGroup(r.palivoId) !== fuelGroup(hintFuel)) return false
+      }
+      // Prevodovka — hard filter (auto vs. manuál)
+      if (hintPrevId && r.prevId) {
+        const rAuto = AUTO_IDS.includes(r.prevId)
+        const wAuto = AUTO_IDS.includes(hintPrevId)
+        if (rAuto !== wAuto) return false
+      }
+      // Rok — v rámci generácie (±1r) alebo ±2 roky ak nemáme generáciu
+      if (r.rok) {
+        if (yearFrom && yearTo) {
+          if (r.rok < yearFrom - 1 || r.rok > yearTo + 1) return false
+        } else if (hintRok) {
+          if (Math.abs(r.rok - hintRok) > 2) return false
+        }
+      }
+      // kW ±15
+      if (hintKw && r.vykon) {
+        if (Math.abs(r.vykon - hintKw) > 15) return false
+      }
+      return true
     })
 
     return {
@@ -267,10 +440,10 @@ async function scrapeABPage(url, hintKw, hintFuel, hintRok) {
 }
 
 // Cache 2 hodiny — ochrana pred IP blokovaním
-const getCachedAB = (url, kw, fuel, rok) =>
+const getCachedAB = (url, kw, fuel, rok, prevId, yearFrom, yearTo) =>
   unstable_cache(
-    () => scrapeABPage(url, kw, fuel, rok),
-    [`ab3-${url}-${kw}-${fuel}-${rok}`],
+    () => scrapeABPage(url, kw, fuel, rok, prevId, yearFrom, yearTo),
+    [`ab5-${url}-${kw}-${fuel}-${rok}-${prevId}-${yearFrom}-${yearTo}`],
     { revalidate: 7200, tags: ['autobazar'] }
   )()
 
@@ -316,9 +489,19 @@ async function scrapeABDetail(url) {
 }
 
 function mapAdRecord(r) {
+  // Mesiac prvej registrácie z "firstRegistration": "2017-09", "09/2017", atď.
+  let month = null
+  if (r.firstRegistration) {
+    const mm = String(r.firstRegistration).match(/(\d{4})[/-](\d{1,2})|(\d{1,2})[/-](\d{4})/)
+    if (mm) {
+      const m = mm[2] ? parseInt(mm[2]) : parseInt(mm[3])
+      if (m >= 1 && m <= 12) month = m
+    }
+  }
   return {
     km:         r.mileage       ?? null,
     rok:        r.yearValue     ? parseInt(r.yearValue) : null,
+    month,
     palivo:     r.fuelValue     || null,
     palivoId:   mapAbPalivo(r.fuelValue),
     vykon:      r.enginePower   ?? null,
@@ -398,56 +581,83 @@ function calcStats(values) {
   }
 }
 
-// ── Podobnosť: Pipedrive deal vs. vstup ─────────────────────────
-function similarity(deal, input) {
-  // Model MUSÍ nejakým spôsobom sedieť
+// ── Podobnosť: Pipedrive deal vs. vstup (strict mode) ───────────
+// gen = { fromYear, toYear, ... } | null
+function similarity(deal, input, gen) {
   if (!input.model) return 0
   const m1 = (deal[F.model] || '').toLowerCase().trim()
   const m2 = input.model.toLowerCase().trim()
   if (!m1) return 0
 
+  // ── Model (50 pts) ─────────────────────────────────────────────
   let score = 0
-  // Model (50 pts)
-  if (m1 === m2)                                    score += 50
-  else if (m1.includes(m2) || m2.includes(m1))     score += 35
-  else if (m1.split(/\s+/)[0] === m2.split(/\s+/)[0]) score += 20
-  else return 0 // žiadna model zhoda → vylúčiť
+  if (m1 === m2)                                        score += 50
+  else if (m1.includes(m2) || m2.includes(m1))         score += 35
+  else if (m1.split(/\s+/)[0] === m2.split(/\s+/)[0])  score += 20
+  else return 0   // žiadna zhoda modelu → vylúčiť
 
-  // KM (25 pts)
-  if (input.km && deal[F.km]) {
-    const r = Math.abs(deal[F.km] - input.km) / input.km
-    if      (r < 0.15) score += 25
-    else if (r < 0.30) score += 15
-    else if (r < 0.50) score += 8
+  // ── Palivo — HARD ELIMINATE ─────────────────────────────────────
+  const fuelGroup = id => {
+    if ([234, 240].includes(id))                return 'diesel'
+    if ([244, 233, 235, 236, 237].includes(id)) return 'benzin'
+    if ([238, 241].includes(id))                return 'hybrid'
+    if ([239].includes(id))                     return 'elektro'
+    return 'other'
   }
-  // Rok (20 pts) — z titulky dealу
+  if (input.palivoId && deal[F.palivo]) {
+    const df = parseInt(deal[F.palivo])
+    if (fuelGroup(df) !== fuelGroup(input.palivoId)) return 0
+    score += (df === input.palivoId) ? 15 : 5
+  }
+
+  // ── Prevodovka — HARD ELIMINATE (auto vs. manuál) ──────────────
+  const AUTO_IDS   = [229,224,225,226,227,223]
+  const MANUAL_IDS = [228,231,232]
+  if (input.prevId && deal[F.prevodovka]) {
+    const dp = parseInt(deal[F.prevodovka])
+    const rA = AUTO_IDS.includes(dp)
+    const rM = MANUAL_IDS.includes(dp)
+    const wA = AUTO_IDS.includes(input.prevId)
+    if (rA && !wA) return 0
+    if (rM && wA)  return 0
+    if (rA && wA || rM && !wA) score += 15
+  }
+
+  // ── KM — HARD ELIMINATE > 40 000 km ────────────────────────────
+  if (input.km && deal[F.km]) {
+    const diff = Math.abs(deal[F.km] - input.km)
+    if (diff > 40000)      return 0
+    else if (diff <= 20000) score += 25
+    else                   score += 12
+  }
+
+  // ── Rok / generácia ─────────────────────────────────────────────
   if (input.rok) {
     const rokM = (deal.title || '').match(/\b(19\d{2}|20[012]\d)\b/)
     if (rokM) {
-      const diff = Math.abs(parseInt(rokM[1]) - input.rok)
-      if      (diff === 0) score += 20
-      else if (diff <= 1)  score += 14
-      else if (diff <= 2)  score += 8
-      else if (diff <= 3)  score += 3
+      const dealRok = parseInt(rokM[1])
+      if (gen) {
+        // Musí byť v generácii (±1 rok tolerancia)
+        if (dealRok < gen.fromYear - 1 || dealRok > gen.toYear + 1) return 0
+        score += (dealRok >= gen.fromYear && dealRok <= gen.toYear) ? 25 : 10
+      } else {
+        const diff = Math.abs(dealRok - input.rok)
+        if      (diff === 0) score += 20
+        else if (diff <= 1)  score += 14
+        else if (diff <= 2)  score += 8
+        else if (diff <= 3)  score += 3
+      }
     }
   }
-  // Palivo (10 pts)
-  if (input.palivoId && deal[F.palivo]) {
-    if (String(deal[F.palivo]) === String(input.palivoId)) score += 10
-  }
-  // Prevodovka (10 pts)
-  if (input.prevId && deal[F.prevodovka]) {
-    const dPrev = parseInt(deal[F.prevodovka])
-    const isAuto   = [229,224,225,226,227,223].includes(dPrev)
-    const isManual = [228,231,232].includes(dPrev)
-    const wantAuto = [229,224,225,226,227,223].includes(input.prevId)
-    if ((isAuto && wantAuto) || (isManual && !wantAuto)) score += 10
-  }
-  // Výkon (5 pts)
+
+  // ── Výkon kW — HARD ELIMINATE > 15 kW ──────────────────────────
   if (input.vykon && deal[F.vykon]) {
-    const d = Math.abs(deal[F.vykon] - input.vykon)
-    if (d < 10) score += 5; else if (d < 25) score += 2
+    const diff = Math.abs(deal[F.vykon] - input.vykon)
+    if (diff > 15)       return 0
+    else if (diff <= 5)  score += 10
+    else                 score += 5
   }
+
   return score
 }
 
@@ -462,17 +672,23 @@ async function resolveAutofill(url, hintKm, hintRok, hintPalivoId, hintPrevId, h
     parsed = parseSlug(url)
 
     if (parsed?.isAutobazar) {
-      const kw   = parsed.vykon    || hintVykon
-      const fuel = parsed.palivoId || hintPalivoId
-      const rok  = parsed.rok      || hintRok
+      const kw     = parsed.vykon    || hintVykon
+      const fuel   = parsed.palivoId || hintPalivoId
+      const rok    = parsed.rok      || hintRok
+      const prevId = parsed.prevId   || hintPrevId
+
+      // Generácia na základe roku zo slugu (detail ešte nemáme)
+      const brandSef = parsed.brandSlug || AB_BRAND_SEF[parsed.znackaId]
+      const gen      = brandSef && parsed.modelSlug && rok
+        ? findGeneration(brandSef, parsed.modelSlug, rok, null)
+        : null
 
       // Paralelne: detail stránka (presné dáta) + search stránka (trhové dáta)
-      const brandSef  = parsed.brandSlug || AB_BRAND_SEF[parsed.znackaId]
-      const searchUrl = buildABSearchUrl(brandSef, parsed.modelSlug)
+      const searchUrl = buildABSearchUrl(brandSef, parsed.modelSlug, gen?.fromYear, gen?.toYear)
 
       ;[detail, abData] = await Promise.all([
         getCachedABDetail(url),
-        searchUrl ? getCachedAB(searchUrl, kw, fuel, rok) : Promise.resolve(null),
+        searchUrl ? getCachedAB(searchUrl, kw, fuel, rok, prevId, gen?.fromYear, gen?.toYear) : Promise.resolve(null),
       ])
 
       // Dopl brand/model z dát ak slug nestačil
@@ -549,40 +765,45 @@ export async function POST(request) {
       })
     }
 
-    // 3. Autobazar.eu trhové dáta
+    // 3. Generácia pre inp (brandSef + modelSef + rok)
+    const inpBrandSef = AB_BRAND_SEF[inp.znackaId]
+    const inpModelSef = inp.model
+      ? inp.model.toLowerCase().replace(/[^\w]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
+      : null
+    const inpGen = inpBrandSef && inpModelSef && inp.rok
+      ? findGeneration(inpBrandSef, inpModelSef, inp.rok, null)
+      : null
+
+    // 4. Autobazar.eu trhové dáta
     // Ak URL nebola zadaná (manuálny vstup), skúsime nájsť trhové dáta sami
     let abMarket = abFromUrl
     if (!abMarket && inp.znackaId) {
-      const brandSef  = AB_BRAND_SEF[inp.znackaId]
-      const modelSef  = inp.model
-        ? inp.model.toLowerCase().replace(/[^\w]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
-        : null
-      const searchUrl = buildABSearchUrl(brandSef, modelSef)
+      const searchUrl = buildABSearchUrl(inpBrandSef, inpModelSef, inpGen?.fromYear, inpGen?.toYear)
       if (searchUrl) {
-        abMarket = await getCachedAB(searchUrl, inp.vykon, inp.palivoId, inp.rok)
+        abMarket = await getCachedAB(searchUrl, inp.vykon, inp.palivoId, inp.rok, inp.prevId, inpGen?.fromYear, inpGen?.toYear)
       }
     }
 
-    // 4. Pipedrive — načítaj vyhrané dealy
+    // 5. Pipedrive — načítaj vyhrané dealy
     const deals = await fetchWonDeals()
 
-    // 5. Filtruj podľa značky + vyhodnoť podobnosť (similarity vyžaduje model zhodu)
+    // 6. Filtruj podľa značky + vyhodnoť podobnosť (strict mode s generáciou)
     const byBrand = inp.znackaId
       ? deals.filter(d => String(d[F.znacka]) === String(inp.znackaId))
       : deals
 
     const scored = byBrand
-      .map(d => ({ ...d, _score: similarity(d, inp) }))
+      .map(d => ({ ...d, _score: similarity(d, inp, inpGen) }))
       .filter(d => d._score > 0)
       .sort((a, b) => b._score - a._score)
       .slice(0, 20)
 
-    // 6. Štatistiky z Pipedrive histórie
+    // 7. Štatistiky z Pipedrive histórie
     const histPredaj = calcStats(scored.map(d => d[F.predane_za]).filter(Boolean))
     const histVykup  = calcStats(scored.map(d => d[F.vykup_za]).filter(Boolean))
     const histProviz = calcStats(scored.map(d => d[F.provizka]).filter(Boolean))
 
-    // 7. Odporúčané ceny
+    // 8. Odporúčané ceny
     //    Predajná: z autobazar.eu filteredStats (aktuálny trh, rok±2, rovnaké palivo)
     //    Výkupná:  z trhovej ceny * historická marža z Pipedrive (fallback 82%)
     const marketMedian  = abMarket?.filteredStats?.median ?? abMarket?.stats?.median ?? null
@@ -593,7 +814,7 @@ export async function POST(request) {
     const recPredaj = marketMedian   ?? histPredaj?.median ?? null
     const recVykup  = recPredaj      ? Math.round(recPredaj * marginRatio) : histVykup?.median ?? null
 
-    // 8. Comparable deals pre tabuľku
+    // 9. Comparable deals pre tabuľku
     const comparable = scored.slice(0, 10).map(d => ({
       id:         d.id,
       title:      d.title,
@@ -617,6 +838,7 @@ export async function POST(request) {
         palivo:     inp.palivoId ? PALIVO[inp.palivoId]    : null,
         prevodovka: inp.prevId   ? PREVODOVKA[inp.prevId]  : null,
       },
+      generation: inpGen,   // napr. { fromYear:2017, toYear:2020, name:'III FL' }
 
       // Odporúčané ceny (hlavný výsledok)
       recommended: {

@@ -210,13 +210,20 @@ export default function KalkulackaPage() {
           <div className={`rounded-xl p-6 shadow-sm ${card}`}>
 
             {/* Popis auta */}
-            <p className="text-sm font-medium text-gray-500 mb-4">
-              {result.input?.brandName} {result.input?.model}
-              {result.input?.rok        ? ` · ${result.input.rok}` : ""}
-              {result.input?.km         ? ` · ${fmtKm(result.input.km)}` : ""}
-              {result.input?.palivo     ? ` · ${result.input.palivo}` : ""}
-              {result.input?.prevodovka ? ` · ${result.input.prevodovka}` : ""}
-            </p>
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <p className="text-sm font-medium text-gray-500">
+                {result.input?.brandName} {result.input?.model}
+                {result.input?.rok        ? ` · ${result.input.rok}` : ""}
+                {result.input?.km         ? ` · ${fmtKm(result.input.km)}` : ""}
+                {result.input?.palivo     ? ` · ${result.input.palivo}` : ""}
+                {result.input?.prevodovka ? ` · ${result.input.prevodovka}` : ""}
+              </p>
+              {result.generation && (
+                <span className="text-xs bg-purple-100 text-purple-700 border border-purple-200 rounded-full px-2.5 py-0.5 font-medium">
+                  🔢 Gen. {result.generation.name} ({result.generation.fromYear}–{result.generation.toYear})
+                </span>
+              )}
+            </div>
 
             {/* Cenové odporúčania */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -304,7 +311,7 @@ export default function KalkulackaPage() {
                   <p className="text-xs text-gray-400 mt-0.5">
                     {result.market.stats?.n} inzerátov celkom
                     {result.market.filteredStats && result.market.filteredCount !== result.market.stats?.n
-                      ? ` · ${result.market.filteredCount} zodpovedá roku ±2 a palivu`
+                      ? ` · ${result.market.filteredCount} zodpovedá ${result.generation ? `gen. ${result.generation.name}` : "roku ±2"} + palivo + prevodovka + kW`
                       : ""}
                   </p>
                 </div>

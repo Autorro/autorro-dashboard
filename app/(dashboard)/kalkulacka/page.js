@@ -15,6 +15,8 @@ export default function KalkulackaPage() {
   const [loading,     setLoading]     = useState(false);
   const [result,      setResult]      = useState(null);
   const [error,       setError]       = useState("");
+  const [aiText,      setAiText]      = useState("");
+  const [aiLoading,   setAiLoading]   = useState(false);
   const debounceRef = useRef(null);
 
   useEffect(() => {
@@ -61,7 +63,7 @@ export default function KalkulackaPage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setLoading(true); setError(""); setResult(null);
+    setLoading(true); setError(""); setResult(null); setAiText(""); setAiLoading(false);
     try {
       const res = await fetch("/api/kalkulacka", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -78,10 +80,36 @@ export default function KalkulackaPage() {
         }),
       });
       const data = await res.json();
-      if (data.error && !data.recommended) setError(data.error);
-      else setResult(data);
-    } catch { setError("Chyba servera"); }
-    setLoading(false);
+      if (data.error && !data.recommended) { setError(data.error); setLoading(false); return; }
+      setResult(data);
+      setLoading(false);
+
+      // Spusti AI analýzu streamingom
+      setAiText(""); setAiLoading(true);
+      try {
+        const aiRes = await fetch("/api/kalkulacka/ai", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            input:      data.input,
+            recommended:data.recommended,
+            market:     data.market,
+            comparable: data.comparable,
+            generation: data.generation,
+            history:    data.history,
+          }),
+        });
+        if (aiRes.ok && aiRes.body) {
+          const reader = aiRes.body.getReader();
+          const dec    = new TextDecoder();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            setAiText(t => t + dec.decode(value, { stream: true }));
+          }
+        }
+      } catch {}
+      setAiLoading(false);
+    } catch { setError("Chyba servera"); setLoading(false); }
   }
 
   const card = "bg-white border border-gray-200";
@@ -349,6 +377,29 @@ export default function KalkulackaPage() {
               </div>
             )}
           </div>
+
+          {/* ── AI analýza Claude ── */}
+          {(aiLoading || aiText) && (
+            <div className={`rounded-xl p-6 shadow-sm ${card} border-l-4 border-l-purple-400`}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-lg">🤖</span>
+                <h2 className="font-semibold text-gray-900">AI analýza oceňovania</h2>
+                {aiLoading && <span className="text-xs text-purple-400 animate-pulse ml-auto">Generujem analýzu…</span>}
+              </div>
+              {aiText ? (
+                <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                  {aiText}
+                  {aiLoading && <span className="inline-block w-1.5 h-4 bg-purple-400 animate-pulse ml-0.5 -mb-0.5" />}
+                </div>
+              ) : (
+                <div className="flex gap-1">
+                  {[0,1,2].map(i => (
+                    <div key={i} className="w-2 h-2 rounded-full bg-purple-300 animate-bounce" style={{ animationDelay: `${i*0.15}s` }} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── Trhové ceny autobazar.eu ── */}
           {result.market?.listings?.length > 0 && (() => {

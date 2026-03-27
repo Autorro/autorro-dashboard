@@ -412,6 +412,9 @@ export default function DashboardClient() {
   // ── Radenie v detaile makléra ─────────────────────────────────
   const [detailSort, setDetailSort] = useState('diff'); // 'diff' | 'cena' | 'faza'
 
+  // ── Radenie zoznamu maklérov ──────────────────────────────────
+  const [brokerSort, setBrokerSort] = useState('health'); // 'health' | 'faza3desc' | 'faza3asc'
+
   function loadDeals(force = false) {
     setRefreshing(true);
     fetch("/api/zdravie-ponuky" + (force ? "?force=1" : ""))
@@ -560,8 +563,18 @@ export default function DashboardClient() {
   });
 
   const brokerList = Object.entries(brokersMap)
-    .map(([name, s]) => ({ name, ...s, pct: s.total > 0 ? Math.round((s.ok / s.total) * 100) : 0 }))
-    .sort((a, b) => b.pct - a.pct);
+    .map(([name, s]) => ({
+      name, ...s,
+      pct:   s.total > 0 ? Math.round((s.ok / s.total) * 100) : 0,
+      faza3: s.deals.filter(d => getInzerciaFaza(getInzerciaDays(d)).num === 3).length,
+    }))
+    .sort((a, b) => {
+      if (brokerSort === 'faza3desc') return b.faza3 - a.faza3;
+      if (brokerSort === 'faza3asc')  return a.faza3 - b.faza3;
+      return b.pct - a.pct;
+    });
+
+  const totalFaza3 = brokerList.reduce((sum, b) => sum + b.faza3, 0);
 
   const totalOk  = officeDeals.filter(d => d[CENA_KEY] == 100).length;
   const totalPct = officeDeals.length > 0 ? Math.round((totalOk / officeDeals.length) * 100) : 0;
@@ -889,7 +902,7 @@ export default function DashboardClient() {
 
         {!loading && <>
           {/* Summary cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-6 md:mb-8">
             <div className={"rounded-xl p-4 " + cardCls}>
               <p className={"text-sm " + (dark ? "text-gray-400" : "text-gray-500")}>Celkom dealov</p>
               <p className="text-2xl font-bold">{officeDeals.length}</p>
@@ -905,6 +918,10 @@ export default function DashboardClient() {
             <div className={"rounded-xl p-4 " + cardCls}>
               <p className={"text-sm " + (dark ? "text-gray-400" : "text-gray-500")}>Zdravie ponuky</p>
               <p className={"text-2xl font-bold " + health.color}>{totalPct}% – {health.label}</p>
+            </div>
+            <div className={"rounded-xl p-4 " + cardCls}>
+              <p className={"text-sm " + (dark ? "text-gray-400" : "text-gray-500")}>Fáza 3 (180+ dní)</p>
+              <p className={"text-2xl font-bold " + (totalFaza3 > 0 ? "text-red-500" : "text-green-400")}>{totalFaza3}</p>
             </div>
           </div>
 
@@ -1182,9 +1199,28 @@ export default function DashboardClient() {
 
           {/* Broker table with expandable rows */}
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <h2 className="text-xl font-semibold">
-              {office === "Všetky" ? "Všetci makléri" : "Makléri – " + office}
-            </h2>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h2 className="text-xl font-semibold">
+                {office === "Všetky" ? "Všetci makléri" : "Makléri – " + office}
+              </h2>
+              <div className="flex items-center gap-1">
+                <span className={"text-xs font-medium " + (dark ? "text-gray-400" : "text-gray-500")}>Zoradiť:</span>
+                {[
+                  { key: 'health',    label: 'Zdravie' },
+                  { key: 'faza3desc', label: 'Fáza 3 ↓' },
+                  { key: 'faza3asc',  label: 'Fáza 3 ↑' },
+                ].map(opt => (
+                  <button key={opt.key}
+                    onClick={() => setBrokerSort(opt.key)}
+                    className={"px-2 py-0.5 rounded text-xs font-medium transition-colors " + (brokerSort === opt.key
+                      ? "text-white"
+                      : (dark ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-600 hover:bg-gray-200"))}
+                    style={brokerSort === opt.key ? { backgroundColor: '#FF501C' } : {}}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="flex items-center gap-2 text-sm">
               {urlCheckState === 'checking' && (
                 <span className={dark ? "text-gray-400" : "text-gray-500"}>
@@ -1226,7 +1262,6 @@ export default function DashboardClient() {
                 {brokerList.map((b, i) => {
                   const h      = getHealth(b.pct);
                   const isOpen = !!expanded[b.name];
-                  const faza3count = b.deals.filter(d => getInzerciaFaza(getInzerciaDays(d)).num === 3).length;
                   const sortedDeals = [...b.deals].sort((a, z) => {
                     if (detailSort === 'cena') {
                       return (z[CENA_VOZIDLA] || 0) - (a[CENA_VOZIDLA] || 0);
@@ -1259,8 +1294,8 @@ export default function DashboardClient() {
                         <td className="p-3 text-green-400 hidden md:table-cell">{b.ok}</td>
                         <td className="p-3 text-red-400 hidden md:table-cell">{b.nie}</td>
                         <td className="p-3 hidden md:table-cell">
-                          {faza3count > 0
-                            ? <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">{faza3count}</span>
+                          {b.faza3 > 0
+                            ? <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">{b.faza3}</span>
                             : <span className="text-gray-300">—</span>}
                         </td>
                         <td className={"p-3 font-bold " + h.color}>{b.pct}%</td>

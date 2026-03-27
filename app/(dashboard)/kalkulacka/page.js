@@ -96,11 +96,12 @@ export default function KalkulackaPage() {
   };
   const AUTO_IDS = [229, 224, 225, 226, 227, 223];
 
-  // Filtruje inzeráty podľa rovnakej motorizácie (±10 kW), paliva a prevodovky
+  // Filtruje inzeráty podľa rovnakej motorizácie (±10 kW), km ±20k, paliva a prevodovky
   function filterListings(listings, input) {
     if (!listings?.length || !input) return listings || [];
     return listings.filter(l => {
       if (input.vykon && l.vykon && Math.abs(l.vykon - input.vykon) > 10) return false;
+      if (input.km    && l.km    && Math.abs(l.km    - input.km)    > 20000) return false;
       if (input.palivoId && l.palivoId && fuelGroup(l.palivoId) !== fuelGroup(input.palivoId)) return false;
       if (input.prevId && l.prevId) {
         const wAuto = AUTO_IDS.includes(input.prevId);

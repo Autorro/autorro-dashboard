@@ -422,18 +422,20 @@ export default function KalkulackaPage() {
             <div className={`rounded-xl shadow-sm overflow-hidden ${card}`}>
               <div className="px-6 py-4 border-b border-gray-100">
                 <h2 className="font-semibold text-gray-900">📂 Podobné predaje v histórii Autorro</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Len deals vyhrané za posledných 12 mesiacov · km ±20 000 · rovnaká prevodovka</p>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-gray-500">
                       <th className="px-4 py-3 text-left font-medium">Auto</th>
+                      <th className="px-4 py-3 text-right font-medium">1. evid.</th>
                       <th className="px-4 py-3 text-right font-medium">KM</th>
                       <th className="px-4 py-3 text-right font-medium hidden sm:table-cell">Prevod.</th>
                       <th className="px-4 py-3 text-right font-medium">Predané za</th>
                       <th className="px-4 py-3 text-right font-medium">Výkup</th>
                       <th className="px-4 py-3 text-left font-medium hidden md:table-cell">Maklér</th>
-                      <th className="px-4 py-3 text-left font-medium hidden md:table-cell">Dátum</th>
+                      <th className="px-4 py-3 text-left font-medium hidden md:table-cell">Vyhrané</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -446,6 +448,7 @@ export default function KalkulackaPage() {
                             <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{d.palivo}</span>
                           )}
                         </td>
+                        <td className="px-4 py-3 text-right text-gray-500">{d.evidencia || "—"}</td>
                         <td className="px-4 py-3 text-right tabular-nums text-gray-600">{fmtKm(d.km)}</td>
                         <td className="px-4 py-3 text-right hidden sm:table-cell text-gray-500">{d.prevodovka || "—"}</td>
                         <td className="px-4 py-3 text-right tabular-nums font-medium text-orange-500">{fmt(d.predanZa)}</td>

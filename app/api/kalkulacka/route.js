@@ -16,6 +16,7 @@ const F = {
   odp_autorro: 'b4d54b0e06789b713abe1062178c19490259e00a',
   odp_makler:  'be22b659e743dc6999971965c384c727f3b1f35b',
   provizka:    '3c229676e9af562e9df014540cc1617eccf9b0cb',
+  evidencia:   'e4eb52fb66a6111543f74a35bbc6aa8eb462c3bd',
 }
 
 // ── Enumerácie ───────────────────────────────────────────────────
@@ -569,6 +570,7 @@ async function fetchWonDeals() {
     'id','title','owner_name','won_time',
     F.znacka, F.model, F.km, F.vykon, F.palivo, F.prevodovka,
     F.predane_za, F.vykup_za, F.odp_autorro, F.odp_makler, F.provizka,
+    F.evidencia,
   ].join(',')
   let all = [], start = 0
   while (true) {
@@ -580,7 +582,10 @@ async function fetchWonDeals() {
     if (!data.additional_data?.pagination?.more_items_in_collection) break
     start += 500
   }
-  return all
+  // Len dealy vyhrané za posledných 12 mesiacov — ceny starších sú zastarané
+  const cutoff = new Date()
+  cutoff.setFullYear(cutoff.getFullYear() - 1)
+  return all.filter(d => d.won_time && new Date(d.won_time) >= cutoff)
 }
 
 // ── Štatistiky ──────────────────────────────────────────────────
@@ -640,30 +645,36 @@ function similarity(deal, input, gen) {
     if (rA && wA || rM && !wA) score += 15
   }
 
-  // ── KM — HARD ELIMINATE > 40 000 km ────────────────────────────
+  // ── KM — HARD ELIMINATE > 20 000 km ────────────────────────────
   if (input.km && deal[F.km]) {
     const diff = Math.abs(deal[F.km] - input.km)
-    if (diff > 40000)      return 0
-    else if (diff <= 20000) score += 25
+    if (diff > 20000)      return 0
+    else if (diff <= 10000) score += 25
     else                   score += 12
   }
 
-  // ── Rok / generácia ─────────────────────────────────────────────
-  if (input.rok) {
+  // ── Dátum 1. evidencie / rok ─────────────────────────────────────
+  // Preferujeme evidencia pole z Pipedrive; fallback na rok z titulku
+  const dealRok = (() => {
+    const ev = deal[F.evidencia]   // napr. "2020-03" alebo "03/2020"
+    if (ev) {
+      const m = String(ev).match(/(\d{4})/)
+      if (m) return parseInt(m[1])
+    }
     const rokM = (deal.title || '').match(/\b(19\d{2}|20[012]\d)\b/)
-    if (rokM) {
-      const dealRok = parseInt(rokM[1])
-      if (gen) {
-        // Musí byť v generácii (±1 rok tolerancia)
-        if (dealRok < gen.fromYear - 1 || dealRok > gen.toYear + 1) return 0
-        score += (dealRok >= gen.fromYear && dealRok <= gen.toYear) ? 25 : 10
-      } else {
-        const diff = Math.abs(dealRok - input.rok)
-        if      (diff === 0) score += 20
-        else if (diff <= 1)  score += 14
-        else if (diff <= 2)  score += 8
-        else if (diff <= 3)  score += 3
-      }
+    return rokM ? parseInt(rokM[1]) : null
+  })()
+
+  if (input.rok && dealRok) {
+    if (gen) {
+      if (dealRok < gen.fromYear - 1 || dealRok > gen.toYear + 1) return 0
+      score += (dealRok >= gen.fromYear && dealRok <= gen.toYear) ? 25 : 10
+    } else {
+      const diff = Math.abs(dealRok - input.rok)
+      if      (diff === 0) score += 20
+      else if (diff <= 1)  score += 14
+      else if (diff <= 2)  score += 8
+      else if (diff > 3)   return 0
     }
   }
 
@@ -846,6 +857,7 @@ export async function POST(request) {
       title:      d.title,
       owner:      d.owner_name,
       wonDate:    (d.won_time || '').substring(0, 10),
+      evidencia:  d[F.evidencia] || null,
       km:         d[F.km]         || null,
       vykon:      d[F.vykon]      || null,
       palivo:     PALIVO[d[F.palivo]]        || null,

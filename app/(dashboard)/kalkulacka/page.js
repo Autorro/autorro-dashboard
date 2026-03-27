@@ -101,7 +101,7 @@ export default function KalkulackaPage() {
     if (!listings?.length || !input) return listings || [];
 
     const strictFilter = (l, kmTolerance) => {
-      if (input.vykon && l.vykon && Math.abs(l.vykon - input.vykon) > 10) return false;
+      if (input.vykon && l.vykon && Math.abs(l.vykon - input.vykon) > 2) return false;
       if (input.palivoId && l.palivoId && fuelGroup(l.palivoId) !== fuelGroup(input.palivoId)) return false;
       if (input.prevId && l.prevId) {
         const wAuto = AUTO_IDS.includes(input.prevId);

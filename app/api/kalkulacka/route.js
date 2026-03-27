@@ -326,7 +326,7 @@ function buildABSearchUrl(brandSef, modelSef, { yearFrom, yearTo, kw, kmFrom, km
   const params = []
   if (yearFrom)        params.push(`yearFrom=${yearFrom}`)
   if (yearTo)          params.push(`yearTo=${yearTo}`)
-  if (kw)              params.push(`powerFrom=${kw - 1}&powerTo=${kw + 1}`)
+  if (kw)              params.push(`powerFrom=${kw - 10}&powerTo=${kw + 10}`)
   if (kmFrom)          params.push(`mileageFrom=${Math.max(0, kmFrom)}`)
   if (kmTo)            params.push(`mileageTo=${kmTo}`)
   return params.length ? `${path}?${params.join('&')}` : path
@@ -462,7 +462,7 @@ async function scrapeABPage(url, hintKw, hintFuel, hintRok, hintPrevId, yearFrom
 const getCachedAB = (url, kw, fuel, rok, prevId, yearFrom, yearTo) =>
   unstable_cache(
     () => scrapeABPage(url, kw, fuel, rok, prevId, yearFrom, yearTo),
-    [`ab10-${url}-${kw}-${fuel}-${rok}-${prevId}-${yearFrom}-${yearTo}`],
+    [`ab11-${url}-${kw}-${fuel}-${rok}-${prevId}-${yearFrom}-${yearTo}`],
     { revalidate: 7200, tags: ['autobazar'] }
   )()
 

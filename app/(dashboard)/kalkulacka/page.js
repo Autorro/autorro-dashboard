@@ -463,9 +463,9 @@ export default function KalkulackaPage() {
             </div>
           )}
 
-          {result.comparable?.length === 0 && !result.market && (
-            <div className={`rounded-xl p-6 text-center ${card}`}>
-              <p className="text-gray-500">Nenašli sa žiadne porovnateľné predaje. Skús zmeniť značku alebo model.</p>
+          {result.comparable?.length === 0 && (
+            <div className={`rounded-xl p-4 ${card}`}>
+              <p className="text-sm text-gray-400 text-center">📂 Žiadne zodpovedajúce predaje v histórii Autorro za posledných 18 mesiacov</p>
             </div>
           )}
         </div>

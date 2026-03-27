@@ -319,7 +319,7 @@ function parseSlug(url) {
 // ── Autobazar.eu search URL ──────────────────────────────────────
 // Správna URL schéma: /vysledky/osobne-vozidla/{brandSef}/{modelSef}/
 // Parametre: powerFrom/powerTo (kW), mileageTo (max km), yearFrom/yearTo
-function buildABSearchUrl(brandSef, modelSef, { yearFrom, yearTo, kw, kmTo } = {}) {
+function buildABSearchUrl(brandSef, modelSef, { yearFrom, yearTo, kw, kmFrom, kmTo } = {}) {
   if (!brandSef) return null
   const base = `https://www.autobazar.eu/vysledky/osobne-vozidla/${brandSef}/`
   const path = modelSef ? `${base}${modelSef}/` : base
@@ -327,6 +327,7 @@ function buildABSearchUrl(brandSef, modelSef, { yearFrom, yearTo, kw, kmTo } = {
   if (yearFrom)        params.push(`yearFrom=${yearFrom}`)
   if (yearTo)          params.push(`yearTo=${yearTo}`)
   if (kw)              params.push(`powerFrom=${kw - 1}&powerTo=${kw + 1}`)
+  if (kmFrom)          params.push(`mileageFrom=${Math.max(0, kmFrom)}`)
   if (kmTo)            params.push(`mileageTo=${kmTo}`)
   return params.length ? `${path}?${params.join('&')}` : path
 }
@@ -461,7 +462,7 @@ async function scrapeABPage(url, hintKw, hintFuel, hintRok, hintPrevId, yearFrom
 const getCachedAB = (url, kw, fuel, rok, prevId, yearFrom, yearTo) =>
   unstable_cache(
     () => scrapeABPage(url, kw, fuel, rok, prevId, yearFrom, yearTo),
-    [`ab9-${url}-${kw}-${fuel}-${rok}-${prevId}-${yearFrom}-${yearTo}`],
+    [`ab10-${url}-${kw}-${fuel}-${rok}-${prevId}-${yearFrom}-${yearTo}`],
     { revalidate: 7200, tags: ['autobazar'] }
   )()
 
@@ -582,9 +583,9 @@ async function fetchWonDeals() {
     if (!data.additional_data?.pagination?.more_items_in_collection) break
     start += 500
   }
-  // Len dealy vyhrané za posledných 12 mesiacov — ceny starších sú zastarané
+  // Len dealy vyhrané za posledných 18 mesiacov — ceny starších sú zastarané
   const cutoff = new Date()
-  cutoff.setFullYear(cutoff.getFullYear() - 1)
+  cutoff.setMonth(cutoff.getMonth() - 18)
   return all.filter(d => d.won_time && new Date(d.won_time) >= cutoff)
 }
 
@@ -645,12 +646,12 @@ function similarity(deal, input, gen) {
     if (rA && wA || rM && !wA) score += 15
   }
 
-  // ── KM — HARD ELIMINATE > 20 000 km ────────────────────────────
+  // ── KM — HARD ELIMINATE > 30 000 km ────────────────────────────
   if (input.km && deal[F.km]) {
     const diff = Math.abs(deal[F.km] - input.km)
-    if (diff > 20000)      return 0
-    else if (diff <= 10000) score += 25
-    else                   score += 12
+    if (diff > 30000)       return 0
+    else if (diff <= 15000) score += 25
+    else                    score += 12
   }
 
   // ── Dátum 1. evidencie / rok ─────────────────────────────────────
@@ -716,7 +717,8 @@ async function resolveAutofill(url, hintKm, hintRok, hintPalivoId, hintPrevId, h
       const searchUrl = buildABSearchUrl(brandSef, parsed.modelSlug, {
         yearFrom: gen?.fromYear, yearTo: gen?.toYear,
         kw,
-        kmTo: hintKm ? hintKm + 20000 : undefined,
+        kmFrom: hintKm ? hintKm - 30000 : undefined,
+        kmTo:   hintKm ? hintKm + 30000 : undefined,
       })
 
       ;[detail, abData] = await Promise.all([
@@ -813,8 +815,9 @@ export async function POST(request) {
     if (!abMarket && inp.znackaId) {
       const searchUrl = buildABSearchUrl(inpBrandSef, inpModelSef, {
         yearFrom: inpGen?.fromYear, yearTo: inpGen?.toYear,
-        kw:   inp.vykon,
-        kmTo: inp.km ? inp.km + 20000 : undefined,
+        kw:     inp.vykon,
+        kmFrom: inp.km ? inp.km - 30000 : undefined,
+        kmTo:   inp.km ? inp.km + 30000 : undefined,
       })
       if (searchUrl) {
         abMarket = await getCachedAB(searchUrl, inp.vykon, inp.palivoId, inp.rok, inp.prevId, inpGen?.fromYear, inpGen?.toYear)

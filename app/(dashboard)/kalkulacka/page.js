@@ -96,20 +96,28 @@ export default function KalkulackaPage() {
   };
   const AUTO_IDS = [229, 224, 225, 226, 227, 223];
 
-  // Filtruje inzeráty podľa rovnakej motorizácie (±10 kW), km ±20k, paliva a prevodovky
+  // Filtruje inzeráty — striktné: kW ±10, palivo, prevodovka; progresívne km
   function filterListings(listings, input) {
     if (!listings?.length || !input) return listings || [];
-    return listings.filter(l => {
+
+    const strictFilter = (l, kmTolerance) => {
       if (input.vykon && l.vykon && Math.abs(l.vykon - input.vykon) > 10) return false;
-      if (input.km    && l.km    && Math.abs(l.km    - input.km)    > 20000) return false;
       if (input.palivoId && l.palivoId && fuelGroup(l.palivoId) !== fuelGroup(input.palivoId)) return false;
       if (input.prevId && l.prevId) {
         const wAuto = AUTO_IDS.includes(input.prevId);
         const rAuto = AUTO_IDS.includes(l.prevId);
         if (wAuto !== rAuto) return false;
       }
+      if (input.km && l.km && kmTolerance != null && Math.abs(l.km - input.km) > kmTolerance) return false;
       return true;
-    });
+    };
+
+    // Progresívne uvoľňuj km toleranciu kým nenájdeme aspoň 2 výsledky
+    for (const kmTol of [20000, 40000, 60000, null]) {
+      const result = listings.filter(l => strictFilter(l, kmTol));
+      if (result.length >= 2 || kmTol === null) return result;
+    }
+    return listings;
   }
 
   // Zisti čo zobrazíme ako hlavné odporúčané ceny
@@ -332,6 +340,23 @@ export default function KalkulackaPage() {
             const filteredRows = filterListings(allRows, result.input);
             const rows         = filteredRows.length > 0 ? filteredRows : allRows;
             const isFiltered   = filteredRows.length > 0 && filteredRows.length < allRows.length;
+            // Zisti aká km tolerancia bola použitá
+            const usedKmTol = (() => {
+              if (!result.input?.km) return null;
+              for (const t of [20000, 40000, 60000, null]) {
+                const n = allRows.filter(l => {
+                  if (result.input.vykon && l.vykon && Math.abs(l.vykon - result.input.vykon) > 10) return false;
+                  if (result.input.palivoId && l.palivoId && fuelGroup(l.palivoId) !== fuelGroup(result.input.palivoId)) return false;
+                  if (result.input.prevId && l.prevId) {
+                    if (AUTO_IDS.includes(l.prevId) !== AUTO_IDS.includes(result.input.prevId)) return false;
+                  }
+                  if (t != null && l.km && Math.abs(l.km - result.input.km) > t) return false;
+                  return true;
+                }).length;
+                if (n >= 2 || t === null) return t;
+              }
+              return null;
+            })();
 
             // Vypočítaj medián filtrovaných cien priamo v UI
             const prices    = filteredRows.map(l => l.price).filter(Boolean).sort((a, b) => a - b);
@@ -348,8 +373,8 @@ export default function KalkulackaPage() {
                     <h2 className="font-semibold text-gray-900">📊 Aktuálny trh — Autobazar.eu</h2>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {isFiltered
-                        ? `${filteredRows.length} zodpovedajúcich z ${allRows.length} inzerátov · rovnaká motorizácia + prevodovka + palivo${result.generation ? ` · gen. ${result.generation.name}` : ""}`
-                        : `${allRows.length} inzerátov${result.input?.vykon || result.input?.palivoId ? " (filtrovanie nenašlo zhodu, zobrazujem všetky)" : " celkom"}`}
+                        ? `${filteredRows.length} zodpovedajúcich z ${allRows.length} · rovnaká motorizácia + prevodovka + palivo${usedKmTol != null ? ` · km ±${(usedKmTol/1000).toFixed(0)}k` : ""}${result.generation ? ` · gen. ${result.generation.name}` : ""}`
+                        : `${allRows.length} inzerátov celkom (bez zhodnej motorizácie v dostupných výsledkoch)`}
                     </p>
                   </div>
                   {displayStats?.median && (

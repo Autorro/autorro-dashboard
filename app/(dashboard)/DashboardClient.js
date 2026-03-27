@@ -545,7 +545,7 @@ export default function DashboardClient() {
 
   function toggleExpand(name) { setExpanded(e => ({ ...e, [name]: !e[name] })); }
 
-  function handleExportPdf() {
+  function generateReportHtml() {
     const fmtM = (val, cur) => {
       if (!val || val === 0) return '—';
       return new Intl.NumberFormat('sk-SK', { style: 'currency', currency: cur || 'EUR', maximumFractionDigits: 0 }).format(val);
@@ -632,11 +632,27 @@ tr.r4{background:#faf5ff}tr.r3{background:#fff7f7}tr.r2{background:#fffbf5}
       html += `</tbody></table></div>`;
     }
     html += `</body></html>`;
+    return html;
+  }
 
+  function handlePrint() {
+    const html = generateReportHtml();
     const win = window.open('', '_blank');
     win.document.write(html);
     win.document.close();
     win.onload = () => win.print();
+    setShowPdfModal(false);
+  }
+
+  function handleDownload() {
+    const html = generateReportHtml();
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `zdravie-ponuky-${new Date().toISOString().split('T')[0]}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
     setShowPdfModal(false);
   }
 
@@ -1636,15 +1652,22 @@ tr.r4{background:#faf5ff}tr.r3{background:#fff7f7}tr.r2{background:#fffbf5}
                 );
               })}
             </div>
-            <div className="flex gap-2">
-              <button onClick={handleExportPdf}
-                disabled={!Object.values(pdfPhases).some(Boolean)}
-                className="flex-1 py-2 rounded-lg text-sm font-bold text-white transition-opacity disabled:opacity-40"
-                style={{ backgroundColor: '#FF501C' }}>
-                Exportovať
-              </button>
+            <div className="flex gap-2 flex-col">
+              <div className="flex gap-2">
+                <button onClick={handlePrint}
+                  disabled={!Object.values(pdfPhases).some(Boolean)}
+                  className="flex-1 py-2 rounded-lg text-sm font-bold text-white transition-opacity disabled:opacity-40"
+                  style={{ backgroundColor: '#FF501C' }}>
+                  🖨️ Tlačiť / PDF
+                </button>
+                <button onClick={handleDownload}
+                  disabled={!Object.values(pdfPhases).some(Boolean)}
+                  className={"flex-1 py-2 rounded-lg text-sm font-bold transition-opacity disabled:opacity-40 " + (dark ? "bg-gray-700 text-white" : "bg-gray-800 text-white")}>
+                  💾 Stiahnuť
+                </button>
+              </div>
               <button onClick={() => setShowPdfModal(false)}
-                className={"py-2 px-4 rounded-lg text-sm font-medium " + (dark ? "bg-gray-700 text-gray-200" : "bg-gray-100 text-gray-700")}>
+                className={"py-2 px-4 rounded-lg text-sm font-medium text-center " + (dark ? "bg-gray-700 text-gray-200" : "bg-gray-100 text-gray-700")}>
                 Zrušiť
               </button>
             </div>

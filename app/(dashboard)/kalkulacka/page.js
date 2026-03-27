@@ -301,11 +301,11 @@ export default function KalkulackaPage() {
           </div>
 
           {/* ── Trhové ceny autobazar.eu ── */}
-          {(result.market?.filteredListings?.length > 0 || result.market?.listings?.length > 0) && (() => {
-            const rows = result.market.filteredListings?.length > 0
-              ? result.market.filteredListings
-              : result.market.listings;
-            const isFiltered = result.market.filteredListings?.length > 0;
+          {result.market?.listings?.length > 0 && (() => {
+            // Preferuj striktne filtrované výsledky; ak nie sú, ukáž aspoň surové
+            const hasFiltered = result.market.filteredListings?.length > 0;
+            const rows = hasFiltered ? result.market.filteredListings : result.market.listings;
+            const isFiltered = hasFiltered;
             return (
               <div className={`rounded-xl shadow-sm overflow-hidden ${card}`}>
                 <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">

@@ -453,7 +453,7 @@ async function scrapeABPage(url, hintKw, hintFuel, hintRok, hintPrevId, yearFrom
 const getCachedAB = (url, kw, fuel, rok, prevId, yearFrom, yearTo) =>
   unstable_cache(
     () => scrapeABPage(url, kw, fuel, rok, prevId, yearFrom, yearTo),
-    [`ab5-${url}-${kw}-${fuel}-${rok}-${prevId}-${yearFrom}-${yearTo}`],
+    [`ab7-${url}-${kw}-${fuel}-${rok}-${prevId}-${yearFrom}-${yearTo}`],
     { revalidate: 7200, tags: ['autobazar'] }
   )()
 

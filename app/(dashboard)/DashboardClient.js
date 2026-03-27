@@ -1217,6 +1217,7 @@ export default function DashboardClient() {
                   <th className="p-3 text-left">Celkom</th>
                   <th className="p-3 text-left hidden md:table-cell">Áno</th>
                   <th className="p-3 text-left hidden md:table-cell">Nie</th>
+                  <th className="p-3 text-left hidden md:table-cell">Fáza 3</th>
                   <th className="p-3 text-left">Zdravie</th>
                   <th className="p-3 text-left w-32 hidden md:table-cell">Graf</th>
                 </tr>
@@ -1225,6 +1226,7 @@ export default function DashboardClient() {
                 {brokerList.map((b, i) => {
                   const h      = getHealth(b.pct);
                   const isOpen = !!expanded[b.name];
+                  const faza3count = b.deals.filter(d => getInzerciaFaza(getInzerciaDays(d)).num === 3).length;
                   const sortedDeals = [...b.deals].sort((a, z) => {
                     if (detailSort === 'cena') {
                       return (z[CENA_VOZIDLA] || 0) - (a[CENA_VOZIDLA] || 0);
@@ -1256,13 +1258,18 @@ export default function DashboardClient() {
                         <td className="p-3">{b.total}</td>
                         <td className="p-3 text-green-400 hidden md:table-cell">{b.ok}</td>
                         <td className="p-3 text-red-400 hidden md:table-cell">{b.nie}</td>
+                        <td className="p-3 hidden md:table-cell">
+                          {faza3count > 0
+                            ? <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">{faza3count}</span>
+                            : <span className="text-gray-300">—</span>}
+                        </td>
                         <td className={"p-3 font-bold " + h.color}>{b.pct}%</td>
                         <td className="p-3 hidden md:table-cell"><HealthBar pct={b.pct} dark={dark} /></td>
                       </tr>
 
                       {isOpen && (
                         <tr key={b.name + "_detail"} className={"border-t " + rowCls}>
-                          <td colSpan={8} className="p-2">
+                          <td colSpan={9} className="p-2">
                             <div className="border-l-4 rounded-lg overflow-hidden" style={{ borderColor: "#FF501C" }}>
                               {/* Sort controls */}
                               <div className={"flex items-center gap-1.5 px-3 py-2 border-b " + (dark ? "border-gray-700 bg-[#3d0e2a]" : "border-gray-100 bg-gray-50")}>

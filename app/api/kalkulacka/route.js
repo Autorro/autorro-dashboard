@@ -359,17 +359,19 @@ async function fetchABRecords(url) {
 // ── Autobazar.eu: scraping 3 stránok výsledkov naraz ─────────────
 async function scrapeABPage(url, hintKw, hintFuel, hintRok, hintPrevId, yearFrom, yearTo) {
   try {
-    // Stránky 1–3 paralelne (page=1 je default, page=2 a page=3 pridávame)
+    // Stránky 1–5 paralelne
     const sep = url.includes('?') ? '&' : '?'
-    const [r1, r2, r3] = await Promise.all([
+    const pages = await Promise.all([
       fetchABRecords(url),
       fetchABRecords(`${url}${sep}page=2`),
       fetchABRecords(`${url}${sep}page=3`),
+      fetchABRecords(`${url}${sep}page=4`),
+      fetchABRecords(`${url}${sep}page=5`),
     ])
 
     // Zlúč a deduplikuj podľa id
     const seen = new Set()
-    const allRecords = [...r1, ...r2, ...r3].filter(r => {
+    const allRecords = pages.flat().filter(r => {
       if (!r.id || seen.has(r.id)) return false
       seen.add(r.id); return true
     })
@@ -442,8 +444,8 @@ async function scrapeABPage(url, hintKw, hintFuel, hintRok, hintPrevId, yearFrom
       brand:            allRecords[0]?.brandValue    || null,
       model:            allRecords[0]?.carModelValue || null,
       matched:          bestMatch,
-      listings:         listings.slice(0, 60),
-      filteredListings: filtered.slice(0, 60),
+      listings:         listings.slice(0, 100),
+      filteredListings: filtered.slice(0, 100),
       stats:            calcStats(listings.map(r => r.price)),
       filteredStats:    calcStats(filtered.map(r => r.price)),
       filteredCount:    filtered.length,
@@ -458,7 +460,7 @@ async function scrapeABPage(url, hintKw, hintFuel, hintRok, hintPrevId, yearFrom
 const getCachedAB = (url, kw, fuel, rok, prevId, yearFrom, yearTo) =>
   unstable_cache(
     () => scrapeABPage(url, kw, fuel, rok, prevId, yearFrom, yearTo),
-    [`ab8-${url}-${kw}-${fuel}-${rok}-${prevId}-${yearFrom}-${yearTo}`],
+    [`ab9-${url}-${kw}-${fuel}-${rok}-${prevId}-${yearFrom}-${yearTo}`],
     { revalidate: 7200, tags: ['autobazar'] }
   )()
 

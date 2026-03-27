@@ -644,16 +644,33 @@ tr.r4{background:#faf5ff}tr.r3{background:#fff7f7}tr.r2{background:#fffbf5}
     setShowPdfModal(false);
   }
 
-  function handleDownload() {
-    const html = generateReportHtml();
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `zdravie-ponuky-${new Date().toISOString().split('T')[0]}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
+  async function handleDownload() {
     setShowPdfModal(false);
+
+    const html = generateReportHtml();
+
+    // Vytvor skrytý kontajner s obsahom reportu
+    const container = document.createElement('div');
+    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:1050px;background:white';
+    container.innerHTML = html;
+    document.body.appendChild(container);
+
+    try {
+      const { default: html2pdf } = await import('html2pdf.js');
+      await html2pdf()
+        .set({
+          margin:      [8, 6, 8, 6],
+          filename:    `zdravie-ponuky-${new Date().toISOString().split('T')[0]}.pdf`,
+          image:       { type: 'jpeg', quality: 0.95 },
+          html2canvas: { scale: 1.5, useCORS: true, logging: false },
+          jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
+          pagebreak:   { mode: ['avoid-all', 'css'] },
+        })
+        .from(container)
+        .save();
+    } finally {
+      document.body.removeChild(container);
+    }
   }
 
   const bg         = dark ? "text-white" : "text-gray-900";

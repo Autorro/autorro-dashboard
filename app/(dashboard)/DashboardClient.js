@@ -409,6 +409,9 @@ export default function DashboardClient() {
   const [urlCheckState,  setUrlCheckState]  = useState('idle'); // 'idle'|'checking'|'done'|'error'
   const [urlCheckCount,  setUrlCheckCount]  = useState({ done: 0, total: 0 });
 
+  // ── Radenie v detaile makléra ─────────────────────────────────
+  const [detailSort, setDetailSort] = useState('diff'); // 'diff' | 'cena' | 'faza'
+
   function loadDeals(force = false) {
     setRefreshing(true);
     fetch("/api/zdravie-ponuky" + (force ? "?force=1" : ""))
@@ -1223,6 +1226,16 @@ export default function DashboardClient() {
                   const h      = getHealth(b.pct);
                   const isOpen = !!expanded[b.name];
                   const sortedDeals = [...b.deals].sort((a, z) => {
+                    if (detailSort === 'cena') {
+                      return (z[CENA_VOZIDLA] || 0) - (a[CENA_VOZIDLA] || 0);
+                    }
+                    if (detailSort === 'faza') {
+                      const aD = getInzerciaDays(a); const zD = getInzerciaDays(z);
+                      const aF = getInzerciaFaza(aD).num; const zF = getInzerciaFaza(zD).num;
+                      if (zF !== aF) return zF - aF;
+                      return zD - aD;
+                    }
+                    // default: 'diff' — nie OK prvé, potom podľa % rozdielu
                     const aOk = a[CENA_KEY] == 100;
                     const zOk = z[CENA_KEY] == 100;
                     if (!aOk && zOk) return -1;
@@ -1251,6 +1264,24 @@ export default function DashboardClient() {
                         <tr key={b.name + "_detail"} className={"border-t " + rowCls}>
                           <td colSpan={8} className="p-2">
                             <div className="border-l-4 rounded-lg overflow-hidden" style={{ borderColor: "#FF501C" }}>
+                              {/* Sort controls */}
+                              <div className={"flex items-center gap-1.5 px-3 py-2 border-b " + (dark ? "border-gray-700 bg-[#3d0e2a]" : "border-gray-100 bg-gray-50")}>
+                                <span className={"text-xs font-medium mr-0.5 " + (dark ? "text-gray-400" : "text-gray-500")}>Zoradiť:</span>
+                                {[
+                                  { key: 'diff',  label: '% rozdiel' },
+                                  { key: 'cena',  label: 'Cena vozidla' },
+                                  { key: 'faza',  label: 'Fáza' },
+                                ].map(opt => (
+                                  <button key={opt.key}
+                                    onClick={e => { e.stopPropagation(); setDetailSort(opt.key); }}
+                                    className={"px-2 py-0.5 rounded text-xs font-medium transition-colors " + (detailSort === opt.key
+                                      ? "text-white"
+                                      : (dark ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-600 hover:bg-gray-200"))}
+                                    style={detailSort === opt.key ? { backgroundColor: '#FF501C' } : {}}>
+                                    {opt.label}
+                                  </button>
+                                ))}
+                              </div>
                               {/* Mobile: cards */}
                               <div className="md:hidden flex flex-col gap-2 p-2">
                                 {sortedDeals.map(d => {

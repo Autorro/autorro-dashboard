@@ -768,9 +768,9 @@ tr.r4{background:#faf5ff}tr.r3{background:#fff7f7}tr.r2{background:#fffbf5}
     <div className={"min-h-screen " + bg} style={bgStyle}>
       {showFireworks && <Fireworks />}
       <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-1">
+        <div className="flex justify-between items-center mb-1 flex-wrap gap-2">
           <h1 className="text-3xl font-bold">Autorro Dashboard</h1>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap justify-end">
             <button
               onClick={() => {
                 if (!partyMode) {

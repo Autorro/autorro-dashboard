@@ -126,12 +126,12 @@ export default function KalkulackaPage() {
   };
   const AUTO_IDS = [229, 224, 225, 226, 227, 223];
 
-  // Filtruje inzeráty — striktné: kW ±10, palivo, prevodovka; progresívne km
+  // Filtruje inzeráty — striktné: kW ±5, palivo, prevodovka; progresívne km
   function filterListings(listings, input) {
     if (!listings?.length || !input) return listings || [];
 
     const strictFilter = (l, kmTolerance) => {
-      if (input.vykon && l.vykon && Math.abs(l.vykon - input.vykon) > 2) return false;
+      if (input.vykon && l.vykon && Math.abs(l.vykon - input.vykon) > 5) return false;
       if (input.palivoId && l.palivoId && fuelGroup(l.palivoId) !== fuelGroup(input.palivoId)) return false;
       if (input.prevId && l.prevId) {
         const wAuto = AUTO_IDS.includes(input.prevId);
@@ -147,10 +147,10 @@ export default function KalkulackaPage() {
       return true;
     };
 
-    // Progresívne uvoľňuj km toleranciu kým nenájdeme aspoň 2 výsledky
+    // Progresívne uvoľňuj km toleranciu kým nenájdeme aspoň 5 výsledkov
     for (const kmTol of [20000, 40000, 60000, null]) {
       const result = listings.filter(l => strictFilter(l, kmTol));
-      if (result.length >= 2 || kmTol === null) return result;
+      if (result.length >= 5 || kmTol === null) return result;
     }
     return listings;
   }
@@ -420,7 +420,7 @@ export default function KalkulackaPage() {
                   if (t != null && l.km && Math.abs(l.km - result.input.km) > t) return false;
                   return true;
                 }).length;
-                if (n >= 2 || t === null) return t;
+                if (n >= 5 || t === null) return t;
               }
               return null;
             })();

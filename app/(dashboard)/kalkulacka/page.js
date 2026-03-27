@@ -301,62 +301,63 @@ export default function KalkulackaPage() {
           </div>
 
           {/* ── Trhové ceny autobazar.eu ── */}
-          {result.market?.listings?.length > 0 && (
-            <div className={`rounded-xl shadow-sm overflow-hidden ${card}`}>
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                  <h2 className="font-semibold text-gray-900">
-                    📊 Aktuálny trh — Autobazar.eu
-                  </h2>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {result.market.stats?.n} inzerátov celkom
-                    {result.market.filteredStats && result.market.filteredCount !== result.market.stats?.n
-                      ? ` · ${result.market.filteredCount} zodpovedá ${result.generation ? `gen. ${result.generation.name}` : "roku ±2"} + palivo + prevodovka + kW`
-                      : ""}
-                  </p>
-                </div>
-                {result.market.filteredStats && (
-                  <div className="text-right">
-                    <p className="text-xs text-gray-400">Medián (filtrované)</p>
-                    <p className="text-lg font-bold text-yellow-600">{fmt(result.market.filteredStats.median)}</p>
-                    <p className="text-xs text-gray-400">{fmt(result.market.filteredStats.min)} – {fmt(result.market.filteredStats.max)}</p>
+          {(result.market?.filteredListings?.length > 0 || result.market?.listings?.length > 0) && (() => {
+            const rows = result.market.filteredListings?.length > 0
+              ? result.market.filteredListings
+              : result.market.listings;
+            const isFiltered = result.market.filteredListings?.length > 0;
+            return (
+              <div className={`rounded-xl shadow-sm overflow-hidden ${card}`}>
+                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                  <div>
+                    <h2 className="font-semibold text-gray-900">
+                      📊 Aktuálny trh — Autobazar.eu
+                    </h2>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {isFiltered
+                        ? `${result.market.filteredCount} zodpovedajúcich inzerátov (z ${result.market.stats?.n} celkom) · rovnaká motorizácia + prevodovka + palivo${result.generation ? ` · gen. ${result.generation.name}` : ""}`
+                        : `${result.market.stats?.n} inzerátov celkom`}
+                    </p>
                   </div>
-                )}
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-gray-50 text-gray-500">
-                      <th className="px-4 py-2 text-left font-medium">Auto</th>
-                      <th className="px-4 py-2 text-right font-medium">Rok</th>
-                      <th className="px-4 py-2 text-right font-medium">KM</th>
-                      <th className="px-4 py-2 text-right font-medium hidden sm:table-cell">Palivo</th>
-                      <th className="px-4 py-2 text-right font-medium hidden md:table-cell">Prevodovka</th>
-                      <th className="px-4 py-2 text-right font-medium">Cena</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.market.listings.slice(0, 12).map((l, i) => {
-                      // Zvýrazni inzeráty zodpovedajúce roku ±2 a palivu
-                      const rokOk  = !result.input?.rok  || !l.rok     || Math.abs(l.rok - result.input.rok) <= 2
-                      const fuelOk = !result.input?.palivoId || !l.palivoId || l.palivoId === result.input.palivoId
-                      const isMatch = rokOk && fuelOk
-                      return (
-                        <tr key={i} className={`border-t border-gray-100 ${isMatch ? "bg-yellow-50/50" : ""}`}>
+                  {result.market.filteredStats && (
+                    <div className="text-right">
+                      <p className="text-xs text-gray-400">Medián</p>
+                      <p className="text-lg font-bold text-yellow-600">{fmt(result.market.filteredStats.median)}</p>
+                      <p className="text-xs text-gray-400">{fmt(result.market.filteredStats.min)} – {fmt(result.market.filteredStats.max)}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-50 text-gray-500">
+                        <th className="px-4 py-2 text-left font-medium">Auto</th>
+                        <th className="px-4 py-2 text-right font-medium">Rok</th>
+                        <th className="px-4 py-2 text-right font-medium">KM</th>
+                        <th className="px-4 py-2 text-right font-medium hidden sm:table-cell">kW</th>
+                        <th className="px-4 py-2 text-right font-medium hidden sm:table-cell">Palivo</th>
+                        <th className="px-4 py-2 text-right font-medium hidden md:table-cell">Prevodovka</th>
+                        <th className="px-4 py-2 text-right font-medium">Cena</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.slice(0, 12).map((l, i) => (
+                        <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
                           <td className="px-4 py-2 text-gray-700 font-medium">{l.title}</td>
-                          <td className={`px-4 py-2 text-right ${rokOk ? "text-gray-700" : "text-gray-400"}`}>{l.rok || "—"}</td>
+                          <td className="px-4 py-2 text-right text-gray-600">{l.rok || "—"}</td>
                           <td className="px-4 py-2 text-right tabular-nums text-gray-500">{fmtKm(l.km)}</td>
-                          <td className={`px-4 py-2 text-right hidden sm:table-cell ${fuelOk ? "text-gray-700" : "text-gray-400"}`}>{l.palivo || "—"}</td>
+                          <td className="px-4 py-2 text-right hidden sm:table-cell text-gray-500">{l.vykon ? `${l.vykon} kW` : "—"}</td>
+                          <td className="px-4 py-2 text-right hidden sm:table-cell text-gray-600">{l.palivo || "—"}</td>
                           <td className="px-4 py-2 text-right hidden md:table-cell text-gray-500">{l.prevodovka || "—"}</td>
-                          <td className={`px-4 py-2 text-right font-semibold tabular-nums ${isMatch ? "text-yellow-700" : "text-gray-500"}`}>{fmt(l.price)}</td>
+                          <td className="px-4 py-2 text-right font-semibold tabular-nums text-yellow-700">{fmt(l.price)}</td>
                         </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ── Podobné predaje v histórii Autorro ── */}
           {result.comparable?.length > 0 && (

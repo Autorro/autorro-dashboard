@@ -389,25 +389,34 @@ async function scrapeABPage(url, hintKw, hintFuel, hintRok, hintPrevId, yearFrom
     }
     if (!bestMatch) bestMatch = listings[0]
 
-    // ── Filtered stats: generácia + palivo + prevodovka + kW ─────
+    // ── Strict filter: rovnaká motorizácia + prevodovka + palivo + rok ─
     const fuelGroup = id => {
-      if ([234, 240].includes(id))           return 'diesel'
+      if ([234, 240].includes(id))                return 'diesel'
       if ([244, 233, 235, 236, 237].includes(id)) return 'benzin'
-      if ([238, 241].includes(id))           return 'hybrid'
-      if ([239].includes(id))                return 'elektro'
+      if ([238, 241].includes(id))                return 'hybrid'
+      if ([239].includes(id))                     return 'elektro'
       return 'other'
     }
     const AUTO_IDS = [229,224,225,226,227,223]
     const filtered = listings.filter(r => {
-      // Palivo — hard filter (rovnaká skupina)
+      // Palivo — hard filter (rovnaká skupina, napr. diesel ≠ benzín)
       if (hintFuel && r.palivoId) {
         if (fuelGroup(r.palivoId) !== fuelGroup(hintFuel)) return false
       }
       // Prevodovka — hard filter (auto vs. manuál)
-      if (hintPrevId && r.prevId) {
-        const rAuto = AUTO_IDS.includes(r.prevId)
+      if (hintPrevId) {
         const wAuto = AUTO_IDS.includes(hintPrevId)
-        if (rAuto !== wAuto) return false
+        if (r.prevId) {
+          const rAuto = AUTO_IDS.includes(r.prevId)
+          if (rAuto !== wAuto) return false
+        } else {
+          // Ak prevodovka inzerátu nie je detekovaná, skús parsovať z titulku
+          const t = (r.title || '').toLowerCase()
+          const titleAuto = /automat|dsg|s-tronic|7g|8g|tiptronic|pdk|cvt/.test(t)
+          const titleMan  = /manu[aá]|manual/.test(t)
+          if (wAuto && titleMan)  return false
+          if (!wAuto && titleAuto) return false
+        }
       }
       // Rok — v rámci generácie (±1r) alebo ±2 roky ak nemáme generáciu
       if (r.rok) {
@@ -417,21 +426,22 @@ async function scrapeABPage(url, hintKw, hintFuel, hintRok, hintPrevId, yearFrom
           if (Math.abs(r.rok - hintRok) > 2) return false
         }
       }
-      // kW ±15
+      // kW — hard filter ±10 kW (rovnaká motorizácia, napr. 110 ≠ 85)
       if (hintKw && r.vykon) {
-        if (Math.abs(r.vykon - hintKw) > 15) return false
+        if (Math.abs(r.vykon - hintKw) > 10) return false
       }
       return true
     })
 
     return {
-      brand:         records[0]?.brandValue     || null,
-      model:         records[0]?.carModelValue  || null,
-      matched:       bestMatch,
-      listings:      listings.slice(0, 20),
-      stats:         calcStats(listings.map(r => r.price)),
-      filteredStats: calcStats(filtered.map(r => r.price)),
-      filteredCount: filtered.length,
+      brand:             records[0]?.brandValue     || null,
+      model:             records[0]?.carModelValue  || null,
+      matched:           bestMatch,
+      listings:          listings.slice(0, 20),
+      filteredListings:  filtered.slice(0, 20),   // len zodpovedajúce inzeráty
+      stats:             calcStats(listings.map(r => r.price)),
+      filteredStats:     calcStats(filtered.map(r => r.price)),
+      filteredCount:     filtered.length,
     }
   } catch (e) {
     console.error('[scrapeABPage]', url, e.message)
@@ -650,10 +660,10 @@ function similarity(deal, input, gen) {
     }
   }
 
-  // ── Výkon kW — HARD ELIMINATE > 15 kW ──────────────────────────
+  // ── Výkon kW — HARD ELIMINATE > 10 kW ──────────────────────────
   if (input.vykon && deal[F.vykon]) {
     const diff = Math.abs(deal[F.vykon] - input.vykon)
-    if (diff > 15)       return 0
+    if (diff > 10)       return 0
     else if (diff <= 5)  score += 10
     else                 score += 5
   }

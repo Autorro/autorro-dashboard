@@ -317,13 +317,16 @@ function parseSlug(url) {
 
 // ── Autobazar.eu search URL ──────────────────────────────────────
 // Správna URL schéma: /vysledky/osobne-vozidla/{brandSef}/{modelSef}/
-function buildABSearchUrl(brandSef, modelSef, yearFrom, yearTo) {
+// Parametre: powerFrom/powerTo (kW), mileageTo (max km), yearFrom/yearTo
+function buildABSearchUrl(brandSef, modelSef, { yearFrom, yearTo, kw, kmTo } = {}) {
   if (!brandSef) return null
   const base = `https://www.autobazar.eu/vysledky/osobne-vozidla/${brandSef}/`
   const path = modelSef ? `${base}${modelSef}/` : base
   const params = []
-  if (yearFrom) params.push(`yearFrom=${yearFrom}`)
-  if (yearTo)   params.push(`yearTo=${yearTo}`)
+  if (yearFrom)        params.push(`yearFrom=${yearFrom}`)
+  if (yearTo)          params.push(`yearTo=${yearTo}`)
+  if (kw)              params.push(`powerFrom=${kw - 1}&powerTo=${kw + 1}`)
+  if (kmTo)            params.push(`mileageTo=${kmTo}`)
   return params.length ? `${path}?${params.join('&')}` : path
 }
 
@@ -453,7 +456,7 @@ async function scrapeABPage(url, hintKw, hintFuel, hintRok, hintPrevId, yearFrom
 const getCachedAB = (url, kw, fuel, rok, prevId, yearFrom, yearTo) =>
   unstable_cache(
     () => scrapeABPage(url, kw, fuel, rok, prevId, yearFrom, yearTo),
-    [`ab7-${url}-${kw}-${fuel}-${rok}-${prevId}-${yearFrom}-${yearTo}`],
+    [`ab8-${url}-${kw}-${fuel}-${rok}-${prevId}-${yearFrom}-${yearTo}`],
     { revalidate: 7200, tags: ['autobazar'] }
   )()
 
@@ -694,7 +697,12 @@ async function resolveAutofill(url, hintKm, hintRok, hintPalivoId, hintPrevId, h
         : null
 
       // Paralelne: detail stránka (presné dáta) + search stránka (trhové dáta)
-      const searchUrl = buildABSearchUrl(brandSef, parsed.modelSlug, gen?.fromYear, gen?.toYear)
+      // kw/km posielame do URL — autobazar.eu filtruje serverovo (powerFrom/powerTo, mileageTo)
+      const searchUrl = buildABSearchUrl(brandSef, parsed.modelSlug, {
+        yearFrom: gen?.fromYear, yearTo: gen?.toYear,
+        kw,
+        kmTo: hintKm ? hintKm + 20000 : undefined,
+      })
 
       ;[detail, abData] = await Promise.all([
         getCachedABDetail(url),
@@ -788,7 +796,11 @@ export async function POST(request) {
     // Ak URL nebola zadaná (manuálny vstup), skúsime nájsť trhové dáta sami
     let abMarket = abFromUrl
     if (!abMarket && inp.znackaId) {
-      const searchUrl = buildABSearchUrl(inpBrandSef, inpModelSef, inpGen?.fromYear, inpGen?.toYear)
+      const searchUrl = buildABSearchUrl(inpBrandSef, inpModelSef, {
+        yearFrom: inpGen?.fromYear, yearTo: inpGen?.toYear,
+        kw:   inp.vykon,
+        kmTo: inp.km ? inp.km + 20000 : undefined,
+      })
       if (searchUrl) {
         abMarket = await getCachedAB(searchUrl, inp.vykon, inp.palivoId, inp.rok, inp.prevId, inpGen?.fromYear, inpGen?.toYear)
       }

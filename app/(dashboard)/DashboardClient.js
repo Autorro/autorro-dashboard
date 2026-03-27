@@ -1288,8 +1288,10 @@ export default function DashboardClient() {
                     }
                     if (detailSort === 'faza') {
                       const aD = getInzerciaDays(a); const zD = getInzerciaDays(z);
-                      const aF = getInzerciaFaza(aD).num; const zF = getInzerciaFaza(zD).num;
-                      if (zF !== aF) return zF - aF;
+                      const aF = getInzerciaFaza(aD).num;  const zF = getInzerciaFaza(zD).num;
+                      const aEff = (aF === 3 && a[CENA_KEY] != 100) ? 4 : aF;
+                      const zEff = (zF === 3 && z[CENA_KEY] != 100) ? 4 : zF;
+                      if (zEff !== aEff) return zEff - aEff;
                       return zD - aD;
                     }
                     // default: 'diff' — nie OK prvé, potom podľa % rozdielu

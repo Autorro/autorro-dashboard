@@ -1377,7 +1377,11 @@ export default function DashboardClient() {
                                           : <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 shrink-0">✗ Nie</span>}
                                       </div>
                                       <div className="grid grid-cols-2 gap-1 text-gray-500">
-                                        <span>#{d.id}</span><span><DaysBadge addTime={d.add_time} /></span>
+                                        <a href={`https://autorro.pipedrive.com/deal/${d.id}`}
+                                          target="_blank" rel="noopener noreferrer"
+                                          className="text-gray-400 hover:underline font-mono"
+                                          onClick={e => e.stopPropagation()}>#{d.id}</a>
+                                        <span><DaysBadge addTime={d.add_time} /></span>
                                         <span>Cena: <span className="font-medium text-gray-800">{fmtMoney(cenaVoz, d.currency)}</span></span>
                                         <span>Odp: <span className="font-medium text-gray-800">{fmtMoney(odAut, d.currency)}</span></span>
                                       </div>
@@ -1427,7 +1431,14 @@ export default function DashboardClient() {
                                     return (
                                       <React.Fragment key={d.id}>
                                         <tr className={"border-t " + subRowCls + " " + rowBg}>
-                                          <td className="px-3 py-2 text-gray-500 font-mono">#{d.id}</td>
+                                          <td className="px-3 py-2 font-mono">
+                                            <a href={`https://autorro.pipedrive.com/deal/${d.id}`}
+                                              target="_blank" rel="noopener noreferrer"
+                                              className="text-gray-400 hover:underline"
+                                              onClick={e => e.stopPropagation()}>
+                                              #{d.id}
+                                            </a>
+                                          </td>
                                           <td className="px-3 py-2 font-medium max-w-[200px] truncate" title={d.title}>
                                             <a href={`https://autorro.pipedrive.com/deal/${d.id}`}
                                               target="_blank" rel="noopener noreferrer"

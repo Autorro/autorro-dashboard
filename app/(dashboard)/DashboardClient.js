@@ -1199,28 +1199,9 @@ export default function DashboardClient() {
 
           {/* Broker table with expandable rows */}
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <div className="flex items-center gap-3 flex-wrap">
-              <h2 className="text-xl font-semibold">
-                {office === "Všetky" ? "Všetci makléri" : "Makléri – " + office}
-              </h2>
-              <div className="flex items-center gap-1">
-                <span className={"text-xs font-medium " + (dark ? "text-gray-400" : "text-gray-500")}>Zoradiť:</span>
-                {[
-                  { key: 'health',    label: 'Zdravie' },
-                  { key: 'faza3desc', label: 'Fáza 3 ↓' },
-                  { key: 'faza3asc',  label: 'Fáza 3 ↑' },
-                ].map(opt => (
-                  <button key={opt.key}
-                    onClick={() => setBrokerSort(opt.key)}
-                    className={"px-2 py-0.5 rounded text-xs font-medium transition-colors " + (brokerSort === opt.key
-                      ? "text-white"
-                      : (dark ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-600 hover:bg-gray-200"))}
-                    style={brokerSort === opt.key ? { backgroundColor: '#FF501C' } : {}}>
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <h2 className="text-xl font-semibold">
+              {office === "Všetky" ? "Všetci makléri" : "Makléri – " + office}
+            </h2>
             <div className="flex items-center gap-2 text-sm">
               {urlCheckState === 'checking' && (
                 <span className={dark ? "text-gray-400" : "text-gray-500"}>
@@ -1253,8 +1234,23 @@ export default function DashboardClient() {
                   <th className="p-3 text-left">Celkom</th>
                   <th className="p-3 text-left hidden md:table-cell">Áno</th>
                   <th className="p-3 text-left hidden md:table-cell">Nie</th>
-                  <th className="p-3 text-left hidden md:table-cell">Fáza 3</th>
-                  <th className="p-3 text-left">Zdravie</th>
+                  <th className="p-3 text-left hidden md:table-cell">
+                    <div className="flex items-center gap-1">
+                      <span>Fáza 3</span>
+                      <button onClick={() => setBrokerSort(s => s === 'faza3desc' ? 'faza3asc' : 'faza3desc')}
+                        className="text-gray-400 hover:text-gray-700 leading-none"
+                        title="Zoradiť podľa Fázy 3">
+                        {brokerSort === 'faza3desc' ? '↓' : brokerSort === 'faza3asc' ? '↑' : '↕'}
+                      </button>
+                    </div>
+                  </th>
+                  <th className="p-3 text-left">
+                    <button onClick={() => setBrokerSort('health')}
+                      className={"font-semibold " + (brokerSort === 'health' ? "underline" : "text-gray-500 hover:text-gray-700")}
+                      title="Zoradiť podľa zdravia">
+                      Zdravie
+                    </button>
+                  </th>
                   <th className="p-3 text-left w-32 hidden md:table-cell">Graf</th>
                 </tr>
               </thead>

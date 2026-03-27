@@ -47,6 +47,14 @@ function normSlug(s) {
 const ZNACKY_REV = Object.fromEntries(
   Object.entries(ZNACKY).map(([id, name]) => [normSlug(name), parseInt(id)])
 )
+// Aliasy pre viacslovné značky (slug obsahuje 2+ slov)
+Object.assign(ZNACKY_REV, {
+  'mercedesbenz': 172,   // mercedes-benz
+  'landrover':    163,   // land-rover
+  'astonmartin':  125,   // aston-martin
+  'rollsroyce':   182,   // rolls-royce
+  'alfromeo':     122,   // alfa-romeo (normSlug removes special chars)
+})
 const PALIVO = {
   233:'Benzín+CNG',234:'Diesel',235:'Benzín+LPG',236:'LPG',237:'CNG',
   238:'Hybrid',239:'Elektro',240:'Diesel+HEV',241:'Benzín+HEV',242:'Iné',244:'Benzín',
@@ -281,15 +289,20 @@ function parseSlug(url) {
       /^\d+kw$/.test(t)        ||   // "110kw"
       /^[a-z]{1,3}\d+/.test(t)      // ID ako "lx30k", "ab123", "rs3", "c220"
 
+    // Jednopísmenové modely (E, A, C, S, X trieda) povolíme len ako PRVÝ token
     const modelTokens = []
     for (let i = brandTokens; i < tArr.length; i++) {
       const t = tArr[i]
-      if (isSpecToken(t) || t.length <= 1) break
+      if (isSpecToken(t)) break
+      const isFirst = modelTokens.length === 0
+      // Jednopísmenový token povolíme len na začiatku (napr. "e" v e-trieda)
+      if (t.length === 1 && !isFirst) break
+      if (t.length === 1 && isFirst && !/^[a-z]$/.test(t)) break
       modelTokens.push(t)
       if (modelTokens.length >= 3) break
     }
-    const modelSlug = modelTokens.join('-')           // "octavia-combi"
-    const model     = modelTokens.join(' ')           // "octavia combi"
+    const modelSlug = modelTokens.join('-')           // "e-trieda" / "octavia-combi"
+    const model     = modelTokens.join(' ')           // "e trieda" / "octavia combi"
 
     // Rok
     const rokMatch = tokens.match(/\b(19\d{2}|20[012]\d)\b/)

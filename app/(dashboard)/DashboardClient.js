@@ -226,8 +226,14 @@ function getInzerciaFaza(days) {
 }
 
 function InzerciaFazaBadge({ deal }) {
-  const days = getInzerciaDays(deal);
-  const faza = getInzerciaFaza(days);
+  const days  = getInzerciaDays(deal);
+  const faza  = getInzerciaFaza(days);
+  const is4   = faza.num === 3 && deal[CENA_KEY] != 100;
+  if (is4) return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">
+      Fáza 4 · {days}d
+    </span>
+  );
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${faza.bg} ${faza.text}`}>
       {faza.label} · {days}d
@@ -567,14 +573,18 @@ export default function DashboardClient() {
       name, ...s,
       pct:   s.total > 0 ? Math.round((s.ok / s.total) * 100) : 0,
       faza3: s.deals.filter(d => getInzerciaFaza(getInzerciaDays(d)).num === 3).length,
+      faza4: s.deals.filter(d => getInzerciaFaza(getInzerciaDays(d)).num === 3 && d[CENA_KEY] != 100).length,
     }))
     .sort((a, b) => {
       if (brokerSort === 'faza3desc') return b.faza3 - a.faza3;
       if (brokerSort === 'faza3asc')  return a.faza3 - b.faza3;
+      if (brokerSort === 'faza4desc') return b.faza4 - a.faza4;
+      if (brokerSort === 'faza4asc')  return a.faza4 - b.faza4;
       return b.pct - a.pct;
     });
 
   const totalFaza3 = brokerList.reduce((sum, b) => sum + b.faza3, 0);
+  const totalFaza4 = brokerList.reduce((sum, b) => sum + b.faza4, 0);
 
   const totalOk  = officeDeals.filter(d => d[CENA_KEY] == 100).length;
   const totalPct = officeDeals.length > 0 ? Math.round((totalOk / officeDeals.length) * 100) : 0;
@@ -902,7 +912,7 @@ export default function DashboardClient() {
 
         {!loading && <>
           {/* Summary cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-6 md:mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-4 mb-6 md:mb-8">
             <div className={"rounded-xl p-4 " + cardCls}>
               <p className={"text-sm " + (dark ? "text-gray-400" : "text-gray-500")}>Celkom dealov</p>
               <p className="text-2xl font-bold">{officeDeals.length}</p>
@@ -922,6 +932,10 @@ export default function DashboardClient() {
             <div className={"rounded-xl p-4 " + cardCls}>
               <p className={"text-sm " + (dark ? "text-gray-400" : "text-gray-500")}>Fáza 3 (180+ dní)</p>
               <p className={"text-2xl font-bold " + (totalFaza3 > 0 ? "text-red-500" : "text-green-400")}>{totalFaza3}</p>
+            </div>
+            <div className={"rounded-xl p-4 " + cardCls}>
+              <p className={"text-sm " + (dark ? "text-gray-400" : "text-gray-500")}>Fáza 4 (180d + cena ✗)</p>
+              <p className={"text-2xl font-bold " + (totalFaza4 > 0 ? "text-purple-600" : "text-green-400")}>{totalFaza4}</p>
             </div>
           </div>
 
@@ -1244,6 +1258,16 @@ export default function DashboardClient() {
                       </button>
                     </div>
                   </th>
+                  <th className="p-3 text-left hidden md:table-cell">
+                    <div className="flex items-center gap-1">
+                      <span className="text-purple-700">Fáza 4</span>
+                      <button onClick={() => setBrokerSort(s => s === 'faza4desc' ? 'faza4asc' : 'faza4desc')}
+                        className="text-purple-300 hover:text-purple-700 leading-none"
+                        title="Zoradiť podľa Fázy 4">
+                        {brokerSort === 'faza4desc' ? '↓' : brokerSort === 'faza4asc' ? '↑' : '↕'}
+                      </button>
+                    </div>
+                  </th>
                   <th className="p-3 text-left">
                     <button onClick={() => setBrokerSort('health')}
                       className={"font-semibold " + (brokerSort === 'health' ? "underline" : "text-gray-500 hover:text-gray-700")}
@@ -1294,13 +1318,18 @@ export default function DashboardClient() {
                             ? <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">{b.faza3}</span>
                             : <span className="text-gray-300">—</span>}
                         </td>
+                        <td className="p-3 hidden md:table-cell">
+                          {b.faza4 > 0
+                            ? <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800">{b.faza4}</span>
+                            : <span className="text-gray-300">—</span>}
+                        </td>
                         <td className={"p-3 font-bold " + h.color}>{b.pct}%</td>
                         <td className="p-3 hidden md:table-cell"><HealthBar pct={b.pct} dark={dark} /></td>
                       </tr>
 
                       {isOpen && (
                         <tr key={b.name + "_detail"} className={"border-t " + rowCls}>
-                          <td colSpan={9} className="p-2">
+                          <td colSpan={10} className="p-2">
                             <div className="border-l-4 rounded-lg overflow-hidden" style={{ borderColor: "#FF501C" }}>
                               {/* Sort controls */}
                               <div className={"flex items-center gap-1.5 px-3 py-2 border-b " + (dark ? "border-gray-700 bg-[#3d0e2a]" : "border-gray-100 bg-gray-50")}>

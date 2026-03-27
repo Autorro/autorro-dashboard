@@ -649,10 +649,23 @@ tr.r4{background:#faf5ff}tr.r3{background:#fff7f7}tr.r2{background:#fffbf5}
 
     const html = generateReportHtml();
 
-    // Vytvor skrytý kontajner s obsahom reportu
+    // Extrahuj <style> a <body> zo vygenerovaného HTML
+    const styleMatch = html.match(/<style>([\s\S]*?)<\/style>/);
+    const bodyMatch  = html.match(/<body>([\s\S]*)<\/body>/);
+
     const container = document.createElement('div');
-    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:1050px;background:white';
-    container.innerHTML = html;
+    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:1050px;background:white;font-family:Arial,sans-serif;font-size:11px;color:#1f2937';
+
+    if (styleMatch) {
+      const style = document.createElement('style');
+      style.textContent = styleMatch[1];
+      container.appendChild(style);
+    }
+
+    const content = document.createElement('div');
+    content.innerHTML = bodyMatch ? bodyMatch[1] : html;
+    container.appendChild(content);
+
     document.body.appendChild(container);
 
     try {

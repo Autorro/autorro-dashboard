@@ -653,8 +653,9 @@ tr.r4{background:#faf5ff}tr.r3{background:#fff7f7}tr.r2{background:#fffbf5}
     const styleMatch = html.match(/<style>([\s\S]*?)<\/style>/);
     const bodyMatch  = html.match(/<body>([\s\S]*)<\/body>/);
 
+    // Kontajner musí byť na obrazovke (nie off-screen) aby ho html2canvas videl
     const container = document.createElement('div');
-    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:1050px;background:white;font-family:Arial,sans-serif;font-size:11px;color:#1f2937';
+    container.style.cssText = 'position:fixed;top:0;left:0;width:1123px;background:white;opacity:0;pointer-events:none;z-index:99999;overflow:visible';
 
     if (styleMatch) {
       const style = document.createElement('style');
@@ -663,10 +664,14 @@ tr.r4{background:#faf5ff}tr.r3{background:#fff7f7}tr.r2{background:#fffbf5}
     }
 
     const content = document.createElement('div');
+    content.style.cssText = 'width:1123px;background:white';
     content.innerHTML = bodyMatch ? bodyMatch[1] : html;
     container.appendChild(content);
 
     document.body.appendChild(container);
+
+    // Počkaj na render DOM
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
     try {
       const { default: html2pdf } = await import('html2pdf.js');
@@ -675,11 +680,11 @@ tr.r4{background:#faf5ff}tr.r3{background:#fff7f7}tr.r2{background:#fffbf5}
           margin:      [8, 6, 8, 6],
           filename:    `zdravie-ponuky-${new Date().toISOString().split('T')[0]}.pdf`,
           image:       { type: 'jpeg', quality: 0.95 },
-          html2canvas: { scale: 1.5, useCORS: true, logging: false },
+          html2canvas: { scale: 1.5, useCORS: true, logging: false, scrollX: 0, scrollY: 0, windowWidth: 1123 },
           jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
           pagebreak:   { mode: ['avoid-all', 'css'] },
         })
-        .from(container)
+        .from(content)
         .save();
     } finally {
       document.body.removeChild(container);

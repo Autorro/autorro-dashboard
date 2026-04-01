@@ -145,13 +145,22 @@ export default function SalesLeaderboardClient() {
     return true;
   });
 
+  /* ── Helpers pre "ako predané" ── */
+  const normAko   = s => (s||'').normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase().trim()
+  const isHotovost = d => normAko(d.akoPredane).includes('hotovos')
+  const isUver     = d => normAko(d.akoPredane).includes('uver')
+  const isPokuta   = d => normAko(d.akoPredane).includes('pokut')
+
   /* ── Agregácia ── */
   const bMap={};
   for(const d of filtered){
-    if(!bMap[d.owner]) bMap[d.owner]={count:0,total:0,totalUver:0,deals:[]};
+    if(!bMap[d.owner]) bMap[d.owner]={count:0,total:0,totalUver:0,countHotovost:0,countUver:0,countPokuta:0,totalPokuta:0,deals:[]};
     bMap[d.owner].count++;
     bMap[d.owner].total    +=toEur(d.cenaVozidla,d.currency);
     bMap[d.owner].totalUver+=(d.proviziaUver||0);
+    if(isHotovost(d))      bMap[d.owner].countHotovost++;
+    else if(isUver(d))     bMap[d.owner].countUver++;
+    else if(isPokuta(d)) { bMap[d.owner].countPokuta++; bMap[d.owner].totalPokuta+=toEur(d.cenaVozidla,d.currency); }
     bMap[d.owner].deals.push(d);
   }
   const allBrokers = Object.entries(bMap)
@@ -169,9 +178,13 @@ export default function SalesLeaderboardClient() {
     ? allBrokers
     : allBrokers.filter(b => pipedriveName && norm(b.name) === norm(pipedriveName));
 
-  const totalDeals   = brokers.reduce((s,b)=>s+b.count,0);
-  const totalRevenue = brokers.reduce((s,b)=>s+b.total,0);
-  const avgPerDeal   = totalDeals?totalRevenue/totalDeals:0;
+  const totalDeals      = brokers.reduce((s,b)=>s+b.count,0);
+  const totalRevenue    = brokers.reduce((s,b)=>s+b.total,0);
+  const avgPerDeal      = totalDeals?totalRevenue/totalDeals:0;
+  const totalHotovost   = brokers.reduce((s,b)=>s+b.countHotovost,0);
+  const totalUverCount  = brokers.reduce((s,b)=>s+b.countUver,0);
+  const totalPokutaCount= brokers.reduce((s,b)=>s+b.countPokuta,0);
+  const totalPokutaSum  = brokers.reduce((s,b)=>s+b.totalPokuta,0);
   const totalThisMonth = Object.values(thisMonthByBroker)
     .filter((_,i)=>!EXCLUDE.some(e=>norm(e)===norm(Object.keys(thisMonthByBroker)[i])))
     .reduce((s,v)=>s+v,0);
@@ -238,6 +251,43 @@ export default function SalesLeaderboardClient() {
           </div>
         ))}
       </div>
+
+      {/* ── Breakdown: Hotovosť / Úver / Pokuta ── */}
+      {(totalHotovost>0||totalUverCount>0||totalPokutaCount>0) && (
+        <div className="rounded-2xl border border-gray-200 bg-white shadow-sm px-5 py-4">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Spôsob predaja – {period==="Vlastné"?"vlastné obdobie":period.toLowerCase()}</p>
+          <div className="flex flex-wrap gap-3">
+            {totalHotovost>0&&(
+              <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 flex-1 min-w-[140px]">
+                <span className="text-xl">💵</span>
+                <div>
+                  <p className="text-xs text-emerald-600 font-semibold">Hotovosť</p>
+                  <p className="text-xl font-extrabold text-emerald-800 leading-none">{totalHotovost} ks</p>
+                </div>
+              </div>
+            )}
+            {totalUverCount>0&&(
+              <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 flex-1 min-w-[140px]">
+                <span className="text-xl">🏦</span>
+                <div>
+                  <p className="text-xs text-blue-600 font-semibold">Úver</p>
+                  <p className="text-xl font-extrabold text-blue-800 leading-none">{totalUverCount} ks</p>
+                </div>
+              </div>
+            )}
+            {totalPokutaCount>0&&(
+              <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex-1 min-w-[140px]">
+                <span className="text-xl">⚠️</span>
+                <div>
+                  <p className="text-xs text-amber-600 font-semibold">Zmluvná pokuta</p>
+                  <p className="text-xl font-extrabold text-amber-800 leading-none">{totalPokutaCount} ks</p>
+                  <p className="text-xs text-amber-500 mt-0.5">{fmtEur(totalPokutaSum)}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Banner: Financovanie (len admin/manažment) ── */}
       {seeAll &&
@@ -414,10 +464,15 @@ export default function SalesLeaderboardClient() {
                     </div>
                   </div>
 
-                  {/* Počet */}
-                  <div className="hidden sm:flex flex-col items-center flex-shrink-0 w-14">
+                  {/* Počet + breakdown */}
+                  <div className="hidden sm:flex flex-col items-center flex-shrink-0 min-w-[56px]">
                     <p className="text-xl font-extrabold text-gray-900 leading-none">{b.count}</p>
-                    <p className="text-xs text-gray-400">aut</p>
+                    <p className="text-xs text-gray-400 mb-1">aut</p>
+                    <div className="flex flex-wrap gap-0.5 justify-center">
+                      {b.countHotovost>0&&<span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full">💵{b.countHotovost}</span>}
+                      {b.countUver>0&&<span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">🏦{b.countUver}</span>}
+                      {b.countPokuta>0&&<span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">⚠️{b.countPokuta}</span>}
+                    </div>
                   </div>
 
                   {/* Obrat + zárobky */}
@@ -567,6 +622,7 @@ export default function SalesLeaderboardClient() {
                         <tr className="bg-gray-50 text-xs uppercase text-gray-400">
                           <th className="px-5 py-2 text-left font-semibold">Vozidlo</th>
                           <th className="px-5 py-2 text-left font-semibold">Predané</th>
+                          <th className="px-5 py-2 text-left font-semibold">Spôsob</th>
                           <th className="px-5 py-2 text-right font-semibold">Pôv. hodnota</th>
                           <th className="px-5 py-2 text-right font-semibold">EUR</th>
                           <th className="px-5 py-2 text-right font-semibold">Zárobek predaj</th>
@@ -582,9 +638,15 @@ export default function SalesLeaderboardClient() {
                           const eU       = (d.proviziaUver||0)*(tier.uverova/100);
                           const hasUver  = (d.proviziaUver||0)>0;
                           return(
-                            <tr key={d.id} className={`hover:bg-gray-50 ${hasUver?"bg-blue-50/30":""}`}>
+                            <tr key={d.id} className={`hover:bg-gray-50 ${isPokuta(d)?"bg-amber-50/40":hasUver?"bg-blue-50/30":""}`}>
                               <td className="px-5 py-2.5 font-medium text-gray-800">{d.title}</td>
                               <td className="px-5 py-2.5 text-gray-500">{fmtDate(d.wonTime)}</td>
+                              <td className="px-5 py-2.5">
+                                {isHotovost(d)&&<span className="inline-flex items-center gap-1 text-[11px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">💵 Hotovosť</span>}
+                                {isUver(d)&&<span className="inline-flex items-center gap-1 text-[11px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">🏦 Úver</span>}
+                                {isPokuta(d)&&<span className="inline-flex items-center gap-1 text-[11px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">⚠️ Pokuta</span>}
+                                {!d.akoPredane&&<span className="text-gray-300 text-xs">—</span>}
+                              </td>
                               <td className="px-5 py-2.5 text-right">
                                 {orig?<span className="font-semibold text-blue-700">{orig}</span>:<span className="text-gray-300">—</span>}
                               </td>
@@ -611,7 +673,7 @@ export default function SalesLeaderboardClient() {
                       </tbody>
                       <tfoot>
                         <tr className="bg-emerald-50">
-                          <td colSpan={3} className="px-5 py-2.5 text-sm font-semibold text-emerald-800">Spolu (EUR)</td>
+                          <td colSpan={4} className="px-5 py-2.5 text-sm font-semibold text-emerald-800">Spolu (EUR)</td>
                           <td className="px-5 py-2.5 text-right font-extrabold text-gray-900">{fmtEur(b.total)}</td>
                           <td className="px-5 py-2.5 text-right font-extrabold text-emerald-800">{fmtEur(earned)}</td>
                           {hasUverDeals&&(

@@ -12,7 +12,7 @@ function normName(s) {
   return (s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim()
 }
 
-async function fetchProviziaFieldKey(apiToken) {
+async function fetchDealFields(apiToken) {
   try {
     const res  = await fetch(
       `https://api.pipedrive.com/v1/dealFields?api_token=${apiToken}&limit=500`,
@@ -22,14 +22,26 @@ async function fetchProviziaFieldKey(apiToken) {
     const fields = json.data || []
     const norm = s => (s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim()
     const find = pred => fields.find(f => pred(norm(f.name)))
-    return (
+
+    const proviziaKey = (
       find(n => n.includes('vyska') && n.includes('provizi'))?.key ||
       find(n => n.includes('uver')  && n.includes('provizi'))?.key ||
       fields.find(f => norm(f.name).includes('provizi') && f.field_type === 'double')?.key ||
       null
     )
+
+    const akoPredaneField = find(n => n.includes('ako') && n.includes('pred'))
+    const akoPredaneKey     = akoPredaneField?.key || null
+    const akoPredaneOptions = {}
+    if (akoPredaneField?.options) {
+      for (const opt of akoPredaneField.options) {
+        akoPredaneOptions[String(opt.id)] = opt.label
+      }
+    }
+
+    return { proviziaKey, akoPredaneKey, akoPredaneOptions }
   } catch {
-    return null
+    return { proviziaKey: null, akoPredaneKey: null, akoPredaneOptions: {} }
   }
 }
 
@@ -55,8 +67,8 @@ async function fetchUserWonDeals(apiToken, userId) {
 
 async function fetchLeaderboardData() {
   const apiToken = process.env.PIPEDRIVE_API_TOKEN
-  const [proviziaKey, users] = await Promise.all([
-    fetchProviziaFieldKey(apiToken),
+  const [{ proviziaKey, akoPredaneKey, akoPredaneOptions }, users] = await Promise.all([
+    fetchDealFields(apiToken),
     fetchAllActiveUsers(apiToken),
   ])
 
@@ -82,6 +94,9 @@ async function fetchLeaderboardData() {
     cenaVozidla:  Number(d.value) || 0,
     currency:     d.currency || 'EUR',
     proviziaUver: proviziaKey && d[proviziaKey] ? Number(d[proviziaKey]) : 0,
+    akoPredane:   akoPredaneKey && d[akoPredaneKey]
+                    ? (akoPredaneOptions[String(d[akoPredaneKey])] || null)
+                    : null,
   }))
 }
 

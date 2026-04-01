@@ -67,17 +67,17 @@ function fmtDate(d) {
 function getRange(period) {
   const now=new Date(), y=now.getFullYear(), m=now.getMonth(), d=now.getDate();
   switch(period){
-    case "Dnes":               return {from:new Date(y,m,d),   to:new Date(y,m,d,23,59,59)};
-    case "Tento mesiac":       return {from:new Date(y,m,1),   to:new Date(y,m+1,0)};
-    case "Minulý mesiac":      return {from:new Date(y,m-1,1), to:new Date(y,m,0)};
-    case "Posledné 3 mesiace": return {from:new Date(y,m-2,1), to:new Date(y,m+1,0)};
-    case "Tento rok":          return {from:new Date(y,0,1),   to:new Date(y,11,31)};
+    case "Dnes":               return {from:new Date(y,m,d),     to:new Date(y,m,d,23,59,59)};
+    case "Tento mesiac":       return {from:new Date(y,m,1),     to:new Date(y,m+1,0,23,59,59)};
+    case "Minulý mesiac":      return {from:new Date(y,m-1,1),   to:new Date(y,m,0,23,59,59)};
+    case "Posledné 3 mesiace": return {from:new Date(y,m-2,1),   to:new Date(y,m+1,0,23,59,59)};
+    case "Tento rok":          return {from:new Date(y,0,1),     to:new Date(y,11,31,23,59,59)};
     default:                   return null;
   }
 }
 function thisMonthRange() {
   const now=new Date(), y=now.getFullYear(), m=now.getMonth();
-  return {from:new Date(y,m,1), to:new Date(y,m+1,0)};
+  return {from:new Date(y,m,1), to:new Date(y,m+1,0,23,59,59)};
 }
 function getMonthProgress() {
   const now=new Date(), y=now.getFullYear(), m=now.getMonth();

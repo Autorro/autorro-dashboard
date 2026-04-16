@@ -153,7 +153,19 @@ export default function ReakcnyClient() {
       <div className={cardCls + " p-8 text-center text-gray-500"}>
         <p className="text-4xl mb-3">📭</p>
         <p className="font-semibold text-lg text-gray-700 mb-1">Zatiaľ žiadne dáta</p>
-        <p className="text-sm">Dáta sa zbierajú automaticky cez Pipedrive webhook. Prvé štatistiky uvidíš keď makléri začnú presúvať dealy.</p>
+        <p className="text-sm mb-4">Dáta sa zbierajú automaticky cez Pipedrive webhook. Prvé štatistiky uvidíš keď makléri začnú presúvať dealy.</p>
+        <button
+          onClick={() => {
+            setLoading(true);
+            fetch("/api/reakčný-čas?force=1")
+              .then(r => r.json())
+              .then(d => setChanges(Array.isArray(d) ? d : []))
+              .finally(() => setLoading(false));
+          }}
+          className="text-xs px-4 py-2 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-100"
+        >
+          🔄 Skúsiť znova
+        </button>
       </div>
     </div>
   );

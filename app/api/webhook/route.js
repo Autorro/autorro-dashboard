@@ -54,7 +54,7 @@ export async function POST(request) {
     const current  = body.data
     const previous = body.previous
 
-    if (action !== 'change')                              return Response.json({ ok: true })
+    if (action !== 'updated' && action !== 'change')      return Response.json({ ok: true })
     if (!previous?.stage_id)                              return Response.json({ ok: true })
     if (current?.stage_id === previous?.stage_id)         return Response.json({ ok: true })
 

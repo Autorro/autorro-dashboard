@@ -24,13 +24,17 @@ export async function GET(request) {
     const force = searchParams.get('force') === '1'
 
     if (force) {
+      // Priame volanie DB bez cache, potom invalidujeme pre ďalšie requesty
       const { revalidateTag } = await import('next/cache')
       revalidateTag('reakčný-čas')
+      const fresh = await fetchReakcnyData()
+      return Response.json(fresh, { headers: { 'X-Cache': 'BYPASSED' } })
     }
 
     const result = await getCachedReakcny()
-    return Response.json(result, { headers: { 'X-Cache': force ? 'REVALIDATED' : 'HIT' } })
-  } catch {
+    return Response.json(result, { headers: { 'X-Cache': 'HIT' } })
+  } catch (err) {
+    console.error('[reakčný-čas] GET error:', err?.message)
     return Response.json({ error: 'Interná chyba' }, { status: 500 })
   }
 }

@@ -100,8 +100,11 @@ export default function ReakcnyClient() {
 
   const reactionTimes = [];
   Object.values(dealMap).forEach(events => {
-    const entry = events.find(e => e.to_stage === 7);
-    const done  = events.find(e => e.to_stage === 9);
+    // Zoradíme ASC aby sme zachytili prvý výskyt
+    const sorted = [...events].sort((a, b) => new Date(a.changed_at) - new Date(b.changed_at));
+    // Hľadáme prvý záznam kde deal opustil stage 7 (to_stage=7 nemáme, lebo webhook bol nastavený keď boli dealy už v stage 7)
+    const entry = sorted.find(e => e.from_stage === 7);
+    const done  = sorted.find(e => e.to_stage === 9);
     if (entry && done) {
       const diff  = new Date(done.changed_at) - new Date(entry.changed_at);
       const hours = Math.round(diff / 3600000);

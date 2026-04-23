@@ -165,10 +165,9 @@ export default function SalesLeaderboardClient() {
     }))
     .sort((a,b)=>b.total-a.total||b.count-a.count);
 
-  // Maklér vidí len seba (podľa pipedriveName z metadát účtu)
-  const brokers = seeAll
-    ? allBrokers
-    : allBrokers.filter(b => pipedriveName && norm(b.name) === norm(pipedriveName));
+  // Makléri vidia celý leaderboard — skrytá je len banner "Príjmy z financovania"
+  // (gated cez `seeAll` nižšie). Per-broker financovanie v detailoch zostáva viditeľné.
+  const brokers = allBrokers;
 
   const totalDeals   = brokers.reduce((s,b)=>s+b.count,0);
   const totalRevenue = brokers.reduce((s,b)=>s+b.total,0);

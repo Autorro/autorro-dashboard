@@ -1,12 +1,10 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { EXCLUDE, CENA_KEY, ODP_AUTORRO, CENA_VOZIDLA } from "@/lib/constants";
-
-// ── Inzercia – field keys ──────────────────────────────────────────────────
-const AUTOBAZAR_URL_KEY  = '8ad28e02d445f11af2064ed71aab1aa1906db534'; // Autobazar.eu/Sauto.sk (new)
-const AUTORRO_URL_KEY    = '65230483051b78019de87ebe7ca1b8380b3e85b2'; // Autorro.sk/cz (new)
-const INZEROVANE_OD_KEY  = '3f9740a67e24bf1c3f3e65360abc0673bb07a4a8'; // Inzerované od (date)
-// const BAZOS_URL_KEY   = null; // zatiaľ nemáme pole – rezervované pre budúcnosť
+import {
+  EXCLUDE, CENA_KEY, ODP_AUTORRO, CENA_VOZIDLA,
+  AUTOBAZAR_URL_KEY, AUTORRO_URL_KEY, INZEROVANE_OD_KEY,
+  OFFICES_WITH_ALL as OFFICES, norm,
+} from "@/lib/constants";
 
 const CONFETTI_EMOJIS = ["🎉","🎊","⭐","✨","🌟","💥","🎈","🏆","🥇","💰","🚗"];
 const CONFETTI_COUNT  = 40;
@@ -55,24 +53,6 @@ function Fireworks() {
       ))}
     </>
   );
-}
-
-const OFFICES = {
-  "Všetky": null,
-  "BB": ["Dominika Kompaniková", "Dominka Kompaníková", "Milan Kováč", "Andrej Čík", "Tomáš Urbán", "Tomás Urban", "Dávid Juhaniak", "David Juhaniak"],
-  "TT": ["Bálint Forró", "Bálint Forro", "Tomáš Opálek", "Karolína Lisická", "Martin Blažek", "Lukáš Krommel"],
-  "NR": ["Martin Petráš", "Dávid Kalužák", "David Kalužák", "Daniel Kádek", "Gabriela Šodorová", "Dávid Čintala"],
-  "BA": ["Milan Švorc", "Ján Mikuš", "Richard Kiss", "Karin Harvan", "Matej Hromada", "Milan Pulc", "Martin Bošeľa", "Peter Maťo", "Jonathán Pavelka", "Matej Klačko", "Dominik Ďurčo"],
-  "TN": ["Libor Koníček", "Tomáš Otrubný", "Ján Skovajsa", "Tomáš Kučerka", "Patrik Frič"],
-  "PD": ["Peter Mjartan", "Martin Mečiar"],
-  "ZA": ["Tomáš Smieško", "Daniel Jašek", "Vladko Hess", "Wlodzimierz Hess", "Irena Varadová", "Matej Gažo", "Veronika Maťková", "Tomáš Ďurana"],
-  "PP": ["Sebastián Čuban", "Tomáš Matta"],
-  "KE": ["Ján Tej", "Adrián Šomšág", "Viliam Baran", "Jaroslav Hažlinský", "Martin Živčák", "Ján Slivka"]
-};
-
-
-function norm(s) {
-  return (s || "").normalize("NFD").replace(/\p{Diacritic}/gu, "").trim().toLowerCase();
 }
 
 function nameMatchesOffice(name, officeNames) {

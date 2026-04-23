@@ -2,15 +2,11 @@ export const runtime = "nodejs";
 
 import WebSocket from "ws";
 import { randomUUID } from "crypto";
+import { NAVOLALA_KEY, WASITLEAD_KEY, WASITLEAD_YES as WASITLEAD_TRUE } from "@/lib/constants";
 
 const HOST = "autorealitka.m2.optimcall.cz";
 const OPTIMCALL_USER     = process.env.OPTIMCALL_USER     || "admin";
 const OPTIMCALL_PASSWORD = process.env.OPTIMCALL_PASSWORD || "";
-
-const NAVOLALA_KEY   = "03fcbb91323260625766779aee5b4589498069b4";
-const WASITLEAD_KEY  = "75d70860fca1d25d8ed8ac4c533979b62d93e1f6";
-// Pipedrive returns enum IDs as strings; 805 = "true" for wasItLead
-const WASITLEAD_TRUE = "805";
 
 // Pipedrive navolala option IDs that belong to telefonists (as strings)
 const TELEFONIST_IDS = new Set(["418", "419", "420", "421", "422", "935", "426"]);

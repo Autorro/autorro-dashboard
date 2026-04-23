@@ -1,26 +1,14 @@
 "use client";
 import { useState } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-
-const OFFICES = {
-  "BB": ["Dominika Kompaniková", "Dominka Kompaníková", "Milan Kováč", "Andrej Čík", "Tomáš Urbán", "Tomás Urban", "Dávid Juhaniak", "David Juhaniak"],
-  "TT": ["Bálint Forró", "Bálint Forro", "Tomáš Opálek", "Karolína Lisická", "Martin Blažek", "Lukáš Krommel"],
-  "NR": ["Martin Petráš", "Dávid Kalužák", "David Kalužák", "Daniel Kádek", "Gabriela Šodorová", "Dávid Čintala"],
-  "BA": ["Milan Švorc", "Ján Mikuš", "Richard Kiss", "Karin Harvan", "Matej Hromada", "Milan Pulc", "Martin Bošeľa", "Peter Maťo", "Jonathán Pavelka", "Matej Klačko", "Dominik Ďurčo"],
-  "TN": ["Libor Koníček", "Tomáš Otrubný", "Ján Skovajsa", "Tomáš Kučerka", "Patrik Frič"],
-  "PD": ["Peter Mjartan", "Martin Mečiar"],
-  "ZA": ["Tomáš Smieško", "Daniel Jašek", "Vladko Hess", "Wlodzimierz Hess", "Irena Varadová", "Matej Gažo", "Veronika Maťková", "Tomáš Ďurana"],
-  "PP": ["Sebastián Čuban", "Tomáš Matta"],
-  "KE": ["Ján Tej", "Adrián Šomšág", "Viliam Baran", "Jaroslav Hažlinský", "Martin Živčák", "Ján Slivka"]
-}
+import { OFFICES, getOffice as getOfficeRaw } from "@/lib/constants";
 
 const COLORS = ["#f97316","#3b82f6","#22c55e","#a855f7","#ef4444","#eab308","#06b6d4","#ec4899"]
 
+// Lokálny wrapper: pre neznáme meno vracia "Iné" (trend dáta môžu mať aj
+// expatriovaných/testovacích maklérov, ktorí nie sú v žiadnej kancelárii).
 function getOffice(name) {
-  for (const [office, names] of Object.entries(OFFICES)) {
-    if (names.some(n => n.trim().toLowerCase() === name.trim().toLowerCase())) return office
-  }
-  return "Iné"
+  return getOfficeRaw(name) || "Iné"
 }
 
 export default function TrendClient({ snapshots }) {

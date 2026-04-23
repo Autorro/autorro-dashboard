@@ -1,24 +1,21 @@
 import { fetchAllPages } from '@/lib/pipedrive'
 import { cache as dataCache } from '@/lib/cache'
-import { INZEROVANE_STAGES } from '@/lib/constants'
+import {
+  INZEROVANE_STAGES,
+  CENA_KEY, ODP_AUTORRO, CENA_VOZIDLA,
+  AUTOBAZAR_URL_KEY, AUTORRO_URL_KEY, INZEROVANE_OD_KEY,
+  norm,
+} from '@/lib/constants'
 
 export const revalidate = 600
 
 const BASE_FIELDS = [
   'id', 'title', 'owner_id', 'owner_name', 'stage_id', 'value', 'currency',
   'status', 'add_time',
-  '880011fdbacbc3eee50103ec49001ac8abd56ae1', // Cena je OK
-  'b4d54b0e06789b713abe1062178c19490259e00a', // Odporúčaná cena – AUTORRO
-  '7bc01b48cc10642c58f19ce14bb33fe8abb7bb97', // Cena vozidla
-  '8ad28e02d445f11af2064ed71aab1aa1906db534', // Autobazar.eu/Sauto.sk (new)
-  '65230483051b78019de87ebe7ca1b8380b3e85b2', // Autorro.sk/cz (new)
-  '3f9740a67e24bf1c3f3e65360abc0673bb07a4a8', // Inzerované od (date)
+  CENA_KEY, ODP_AUTORRO, CENA_VOZIDLA,
+  AUTOBAZAR_URL_KEY, AUTORRO_URL_KEY, INZEROVANE_OD_KEY,
   // BAZOS_URL_KEY = null (pre budúcnosť, zatiaľ nemáme pole)
 ]
-
-function norm(s) {
-  return (s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim()
-}
 
 async function fetchFieldMeta(apiToken) {
   const res    = await fetch(

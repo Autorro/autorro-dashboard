@@ -1,21 +1,25 @@
 import TrendClient from "./TrendClient";
-import { createClient } from '@supabase/supabase-js'
+import { getServerSupabase } from "../../../lib/auth-server";
 
 async function getData() {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  )
-  const { data } = await supabase
+  const supabase = await getServerSupabase();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
     .from('health_snapshots')
     .select('*')
-    .order('snapshot_date', { ascending: true })
-  return data || []
+    .order('snapshot_date', { ascending: true });
+
+  if (error) {
+    console.error('[trend] health_snapshots query failed:', error.message);
+    return [];
+  }
+  return data || [];
 }
 
 export const dynamic = "force-dynamic";
 
 export default async function TrendPage() {
-  const snapshots = await getData()
-  return <TrendClient snapshots={snapshots} />
+  const snapshots = await getData();
+  return <TrendClient snapshots={snapshots} />;
 }

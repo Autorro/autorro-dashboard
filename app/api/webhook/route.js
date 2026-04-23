@@ -9,10 +9,11 @@ const PIPEDRIVE_TOKEN = process.env.PIPEDRIVE_API_TOKEN
  */
 function isAuthorized(request) {
   const webhookSecret = process.env.WEBHOOK_SECRET
-  // Ak secret nie je nakonfigurovaný, logy upozornenie ale prepusť (backward compat)
+  // Bez secretu webhook nespustíme — predtým sme ticho prepúšťali všetky volania,
+  // čo bol bypass auth (ktokoľvek mohol vkladať fake stage_changes do DB).
   if (!webhookSecret) {
-    console.warn('[webhook] WEBHOOK_SECRET nie je nastavený – webhook nie je chránený!')
-    return true
+    console.error('[webhook] WEBHOOK_SECRET nie je nastavený — webhook je odmietnutý.')
+    return false
   }
 
   // 1. Query parameter: ?secret=XXX

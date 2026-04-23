@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Cell, ReferenceLine,
@@ -68,16 +69,16 @@ function buildHistogram(times) {
 
 /* ── Hlavný komponent ── */
 export default function ReakcnyClient() {
-  const [changes,   setChanges]   = useState([]);
-  const [loading,   setLoading]   = useState(true);
   const [expanded,  setExpanded]  = useState(null);
 
-  useEffect(() => {
-    fetch("/api/reakčný-čas")
-      .then(r => r.json())
-      .then(d => setChanges(Array.isArray(d) ? d : []))
-      .finally(() => setLoading(false));
-  }, []);
+  const { data, isLoading, isValidating, mutate } = useSWR("/api/reakčný-čas");
+  const changes = Array.isArray(data) ? data : [];
+  const loading = isLoading && !data;
+
+  const refresh = async () => {
+    await fetch("/api/reakčný-čas?force=1", { cache: "no-store" });
+    mutate();
+  };
 
   /* ── Skeleton ── */
   if (loading) return (
@@ -155,16 +156,11 @@ export default function ReakcnyClient() {
         <p className="font-semibold text-lg text-gray-700 mb-1">Zatiaľ žiadne dáta</p>
         <p className="text-sm mb-4">Dáta sa zbierajú automaticky cez Pipedrive webhook. Prvé štatistiky uvidíš keď makléri začnú presúvať dealy.</p>
         <button
-          onClick={() => {
-            setLoading(true);
-            fetch("/api/reakčný-čas?force=1")
-              .then(r => r.json())
-              .then(d => setChanges(Array.isArray(d) ? d : []))
-              .finally(() => setLoading(false));
-          }}
-          className="text-xs px-4 py-2 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-100"
+          onClick={refresh}
+          disabled={isValidating}
+          className="text-xs px-4 py-2 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-60"
         >
-          🔄 Skúsiť znova
+          {isValidating ? "⏳ Obnovujem…" : "🔄 Skúsiť znova"}
         </button>
       </div>
     </div>
@@ -190,16 +186,11 @@ export default function ReakcnyClient() {
           <p className="text-sm text-gray-500 mt-0.5">Čas od "Dohodnúť stretnutie" po "Dohodnuté stretnutie"</p>
         </div>
         <button
-          onClick={() => {
-            setLoading(true);
-            fetch("/api/reakčný-čas?force=1")
-              .then(r => r.json())
-              .then(d => setChanges(Array.isArray(d) ? d : []))
-              .finally(() => setLoading(false));
-          }}
-          className="text-xs px-3 py-1.5 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center gap-1"
+          onClick={refresh}
+          disabled={isValidating}
+          className="text-xs px-3 py-1.5 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center gap-1 disabled:opacity-60"
         >
-          🔄 Obnoviť
+          {isValidating ? "⏳ Obnovujem…" : "🔄 Obnoviť"}
         </button>
       </div>
 

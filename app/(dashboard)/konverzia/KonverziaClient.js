@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import { OFFICES_WITH_ALL as OFFICES, INZEROVANE_STAGES } from "@/lib/constants";
 
 const INZEROVANE = new Set(INZEROVANE_STAGES);
@@ -63,20 +64,15 @@ function aggregate(deals) {
 }
 
 export default function KonverziaClient() {
-  const [allDeals, setAllDeals] = useState([]);
-  const [loading, setLoading]   = useState(true);
   const [office, setOffice]     = useState("Všetky");
   const [dark, setDark]         = useState(false);
   const [timeKey, setTimeKey]   = useState("vsetky");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo]     = useState("");
 
-  useEffect(() => {
-    fetch("/api/wasitlead-conversion")
-      .then(r => r.json())
-      .then(d => { setAllDeals(d.deals || []); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, []);
+  const { data, isLoading } = useSWR("/api/wasitlead-conversion");
+  const allDeals = data?.deals || [];
+  const loading  = isLoading && !data;
 
   // --- styling ---
   const bg       = dark ? "text-white" : "text-gray-900";

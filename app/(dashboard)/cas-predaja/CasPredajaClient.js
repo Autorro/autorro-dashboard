@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useMemo } from "react";
+import useSWR from "swr";
 import { OFFICES_WITH_ALL as OFFICES, EXCLUDE } from "@/lib/constants";
 
 function getSpeed(avg) {
@@ -49,27 +50,23 @@ function getOfficeNames(office) {
 }
 
 export default function CasPredajaClient() {
-  const [statsMap, setStatsMap]   = useState({});
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState(null);
   const [office, setOffice]       = useState("Všetky");
   const [dark, setDark]           = useState(false);
   const [expanded, setExpanded]   = useState({}); // { brokerName: true/false }
 
-  useEffect(() => {
-    fetch("/api/cas-predaja")
-      .then(r => r.json())
-      .then(data => {
-        const map = {};
-        for (const row of data) {
-          if (!row.owner_name) continue;
-          map[row.owner_name.trim().toLowerCase()] = row;
-        }
-        setStatsMap(map);
-        setLoading(false);
-      })
-      .catch(() => { setError("Nepodarilo sa načítať dáta."); setLoading(false); });
-  }, []);
+  const { data, error: swrError, isLoading } = useSWR("/api/cas-predaja");
+  const loading = isLoading && !data;
+  const error   = swrError ? "Nepodarilo sa načítať dáta." : null;
+
+  const statsMap = useMemo(() => {
+    const map = {};
+    if (!Array.isArray(data)) return map;
+    for (const row of data) {
+      if (!row.owner_name) continue;
+      map[row.owner_name.trim().toLowerCase()] = row;
+    }
+    return map;
+  }, [data]);
 
   function getStats(name) { return statsMap[name.trim().toLowerCase()] || null; }
   function toggleExpand(name) { setExpanded(e => ({ ...e, [name]: !e[name] })); }

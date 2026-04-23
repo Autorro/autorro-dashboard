@@ -4,6 +4,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { UserProvider } from "../../lib/user-context";
 import { createClient } from "../../lib/supabase";
+import SWRProvider from "../../components/SWRProvider";
+import RefreshButton from "../../components/RefreshButton";
 
 const HUB_URL = "https://app.autorro.sk";
 
@@ -103,6 +105,7 @@ function DashboardLayoutInner({ children }) {
           <NavItems />
         </nav>
         <div className="flex flex-col gap-1 mt-auto pt-3 border-t border-[#5c1a42]">
+          <RefreshButton />
           <HubLink />
           <LogoutButton />
         </div>
@@ -149,6 +152,7 @@ function DashboardLayoutInner({ children }) {
           <NavItems onClick={() => setMenuOpen(false)} />
         </nav>
         <div className="flex flex-col gap-1 mt-auto pt-3 border-t border-[#5c1a42]">
+          <RefreshButton />
           <HubLink onClick={() => setMenuOpen(false)} />
           <LogoutButton />
         </div>
@@ -165,8 +169,10 @@ function DashboardLayoutInner({ children }) {
 export default function DashboardLayout({ children }) {
   const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "").split(",");
   return (
-    <UserProvider adminEmails={adminEmails}>
-      <DashboardLayoutInner>{children}</DashboardLayoutInner>
-    </UserProvider>
+    <SWRProvider>
+      <UserProvider adminEmails={adminEmails}>
+        <DashboardLayoutInner>{children}</DashboardLayoutInner>
+      </UserProvider>
+    </SWRProvider>
   );
 }

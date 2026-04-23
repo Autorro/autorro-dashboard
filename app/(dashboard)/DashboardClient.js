@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import useSWR from "swr";
 import {
   EXCLUDE, CENA_KEY, ODP_AUTORRO, CENA_VOZIDLA,
   AUTOBAZAR_URL_KEY, AUTORRO_URL_KEY, INZEROVANE_OD_KEY,
@@ -357,8 +358,6 @@ function computeBrokerHealth(deals) {
 }
 
 export default function DashboardClient() {
-  const [deals, setDeals]       = useState([]);
-  const [loading, setLoading]   = useState(true);
   const [office, setOffice]     = useState("Všetky");
   const [dark, setDark]         = useState(false);
   const [expanded, setExpanded] = useState({});
@@ -366,7 +365,6 @@ export default function DashboardClient() {
   const [showFireworks, setShowFireworks]   = useState(false);
   const [countdown, setCountdown]           = useState(REFRESH_SEC);
   const [history, setHistory]               = useState([]); // [{time, health:{name:pct}, prices}]
-  const [refreshing, setRefreshing]         = useState(false);
   const [partyResults, setPartyResults]     = useState(null); // výsledky po ukončení party
   const baselineRef       = useRef(null);
   const baselinePricesRef = useRef(null);
@@ -380,8 +378,8 @@ export default function DashboardClient() {
   const [trendPeriod,     setTrendPeriod]     = useState('week');
   const [trendCustomFrom, setTrendCustomFrom] = useState('');
   const [trendCustomTo,   setTrendCustomTo]   = useState('');
-  const [trendSnapshots,  setTrendSnapshots]  = useState(null); // null = ešte nenačítané
-  const [trendLoading,    setTrendLoading]    = useState(false);
+  const [trendKey,        setTrendKey]        = useState(null); // SWR key pre trend; null = ešte neaktivované
+  const [trendLoadingManual, setTrendLoadingManual] = useState(false);
   const [loadError,   setLoadError]   = useState(false);
   const [trendError,  setTrendError]  = useState(false);
 
@@ -390,31 +388,37 @@ export default function DashboardClient() {
   const [urlCheckState,  setUrlCheckState]  = useState('idle'); // 'idle'|'checking'|'done'|'error'
   const [urlCheckCount,  setUrlCheckCount]  = useState({ done: 0, total: 0 });
 
-  function loadDeals(force = false) {
-    setRefreshing(true);
-    fetch("/api/zdravie-ponuky" + (force ? "?force=1" : ""))
-      .then(r => r.json())
-      .then(data => {
-        setDeals(data);
-        setLoading(false);
-        setRefreshing(false);
-        const health = computeBrokerHealth(data);
-        // Snapshot cien: { dealId → { title, price, owner, currency } }
-        const prices = {};
-        data.forEach(d => {
-          if (!EXCLUDE.includes(d.owner_name) && d[CENA_VOZIDLA] > 0) {
-            prices[d.id] = { title: d.title, price: d[CENA_VOZIDLA], owner: d.owner_name, currency: d.currency || "EUR" };
-          }
-        });
-        if (!baselineRef.current)       baselineRef.current       = health;
-        if (!baselinePricesRef.current) baselinePricesRef.current = prices;
-        setHistory(h => [...h.slice(-9), {
-          time: new Date().toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-          health,
-          prices,
-        }]);
-      })
-      .catch(() => { setLoading(false); setRefreshing(false); setLoadError(true); });
+  /* ── Dáta cez SWR: cache v localStorage + auto-refresh + stale-while-revalidate ── */
+  const { data: swrData, error: swrErr, isLoading: swrLoading, isValidating, mutate: mutateDeals } =
+    useSWR("/api/zdravie-ponuky");
+  const deals      = Array.isArray(swrData) ? swrData : [];
+  const loading    = swrLoading && !swrData;
+  const refreshing = isValidating;
+
+  // Po prijatí nových dát zaznač health/prices snapshot do histórie
+  useEffect(() => {
+    if (!Array.isArray(swrData)) return;
+    const health = computeBrokerHealth(swrData);
+    const prices = {};
+    swrData.forEach(d => {
+      if (!EXCLUDE.includes(d.owner_name) && d[CENA_VOZIDLA] > 0) {
+        prices[d.id] = { title: d.title, price: d[CENA_VOZIDLA], owner: d.owner_name, currency: d.currency || "EUR" };
+      }
+    });
+    if (!baselineRef.current)       baselineRef.current       = health;
+    if (!baselinePricesRef.current) baselinePricesRef.current = prices;
+    setHistory(h => [...h.slice(-9), {
+      time: new Date().toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+      health,
+      prices,
+    }]);
+  }, [swrData]);
+
+  useEffect(() => { if (swrErr) setLoadError(true); }, [swrErr]);
+
+  async function loadDeals(force = false) {
+    if (force) await fetch("/api/zdravie-ponuky?force=1", { cache: "no-store" });
+    mutateDeals();
   }
 
   function daysAgo(n) {
@@ -431,14 +435,17 @@ export default function DashboardClient() {
     else if (period === 'year')   from = new Date().getFullYear() + '-01-01';
     else if (period === 'custom') { from = customFrom; to = customTo || today; }
     if (!from) return;
-    setTrendError(false); setTrendLoading(true);
-    fetch(`/api/trend-zdravia?from=${from}&to=${to}`)
-      .then(r => r.json())
-      .then(res => { setTrendSnapshots(res.snapshots || []); setTrendLoading(false); })
-      .catch(() => { setTrendLoading(false); setTrendError(true); });
+    setTrendError(false);
+    setTrendKey(`/api/trend-zdravia?from=${from}&to=${to}`);
   }
 
-  useEffect(() => { loadDeals(false); }, []);
+  // Trend cez SWR — zapne sa keď `trendKey` nie je null
+  const { data: trendData, error: trendSwrErr, isLoading: trendSwrLoading } = useSWR(trendKey);
+  const trendSnapshots = trendKey ? (trendData?.snapshots ?? null) : null;
+  const trendLoading   = trendLoadingManual || (trendKey && trendSwrLoading && !trendData);
+  useEffect(() => { if (trendSwrErr) setTrendError(true); }, [trendSwrErr]);
+
+  // Pôvodný useEffect(loadDeals) nahradený useSWR vyššie.
 
   // Kontrola URL inzerátov — volaná manuálne aj automaticky pri načítaní
   async function checkListingUrls() {

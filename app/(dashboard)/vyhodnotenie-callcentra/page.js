@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 
 const PERIODS = [
   { label: "Dnes",              days: 0  },
@@ -290,27 +291,14 @@ function LeaderboardTable({ agents }) {
 
 export default function VyhodnotenieCCPage() {
   const [periodIdx, setPeriodIdx] = useState(0);
-  const [data,    setData]    = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState(null);
 
-  const load = useCallback(async (idx) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { dateFrom, dateTo } = getDateRange(PERIODS[idx].days);
-      const res  = await fetch(`/api/optimcall?dateFrom=${dateFrom}&dateTo=${dateTo}`);
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.error || "Chyba načítania");
-      setData(json);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { dateFrom, dateTo } = getDateRange(PERIODS[periodIdx].days);
+  const swrKey = `/api/optimcall?dateFrom=${dateFrom}&dateTo=${dateTo}`;
+  const { data: rawData, error: swrError, isLoading } = useSWR(swrKey);
 
-  useEffect(() => { load(periodIdx); }, [periodIdx, load]);
+  const data    = rawData && rawData.ok ? rawData : null;
+  const loading = isLoading && !rawData;
+  const error   = swrError ? swrError.message : (rawData && !rawData.ok ? (rawData.error || "Chyba načítania") : null);
 
   return (
     <div className="space-y-6">

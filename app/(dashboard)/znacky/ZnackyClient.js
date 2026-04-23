@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 
 const ACCENT = "#FF501C";
 
@@ -40,21 +41,18 @@ const SORT_OPTIONS = [
 ];
 
 export default function ZnackyClient() {
-  const [data,    setData]    = useState([]);
-  const [loading, setLoading] = useState(true);
   const [sort,    setSort]    = useState("total");
   const [search,  setSearch]  = useState("");
   const [minOp,   setMinOp]   = useState(1);
 
-  const load = (force=false) => {
-    setLoading(true);
-    fetch(`/api/znacky${force?"?force=1":""}`)
-      .then(r => r.json())
-      .then(d => setData(Array.isArray(d) ? d : []))
-      .finally(() => setLoading(false));
-  };
+  const { data: raw, isLoading, isValidating, mutate } = useSWR("/api/znacky");
+  const data    = Array.isArray(raw) ? raw : [];
+  const loading = isLoading && !raw;
 
-  useEffect(() => { load(); }, []);
+  const load = async (force = false) => {
+    if (force) await fetch("/api/znacky?force=1", { cache: "no-store" });
+    mutate();
+  };
 
   const filtered = data
     .filter(b => !EXCLUDE_BRANDS.has(b.brand))

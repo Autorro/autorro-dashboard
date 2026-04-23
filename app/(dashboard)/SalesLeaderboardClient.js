@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import { useUser, canSeeAll } from "../../lib/user-context";
 import { OFFICES_WITH_ALL as OFFICES, EXCLUDE, norm } from "@/lib/constants";
 
@@ -78,8 +79,6 @@ const ACCENT  = "#FF501C";
 
 /* ══════════════════════════════════════════════════════ */
 export default function SalesLeaderboardClient() {
-  const [allDeals, setAllDeals] = useState([]);
-  const [loading,  setLoading]  = useState(true);
   const [office,   setOffice]   = useState("Všetky");
   const [period,   setPeriod]   = useState("Tento mesiac");
   const [from,     setFrom]     = useState("");
@@ -90,13 +89,10 @@ export default function SalesLeaderboardClient() {
   const { role } = useUser();
   const seeAll = canSeeAll(role); // admin alebo manažment → true
 
-  useEffect(()=>{
-    setLoading(true);
-    fetch("/api/leaderboard")
-      .then(r=>r.json())
-      .then(d=>setAllDeals(Array.isArray(d)?d:[]))
-      .finally(()=>setLoading(false));
-  },[]);
+  /* ── Dáta cez SWR: z cache okamžite, refetch na pozadí ── */
+  const { data, isLoading, isValidating, mutate } = useSWR("/api/leaderboard");
+  const allDeals = Array.isArray(data) ? data : [];
+  const loading  = isLoading && !data; // ukáž skeleton len keď reálne nemáme nič
 
   /* ── Kariérne all-time totaly (bez filtra) ── */
   const allTimeByBroker = {};
@@ -195,9 +191,13 @@ export default function SalesLeaderboardClient() {
           <p className="text-sm text-gray-400 mt-0.5">Obrat a zárobky podľa makléra · pozícia = kariérny objem</p>
         </div>
         <button
-          onClick={()=>{setLoading(true);fetch("/api/leaderboard?force=1").then(r=>r.json()).then(d=>setAllDeals(Array.isArray(d)?d:[])).finally(()=>setLoading(false));}}
-          className="text-xs px-4 py-2 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-1.5 font-medium"
-        >🔄 Obnoviť</button>
+          onClick={async () => {
+            await fetch("/api/leaderboard?force=1", { cache: "no-store" });
+            mutate();
+          }}
+          disabled={isValidating}
+          className="text-xs px-4 py-2 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-1.5 font-medium disabled:opacity-60"
+        >{isValidating ? "⏳ Obnovujem…" : "🔄 Obnoviť"}</button>
       </div>
 
       {/* ── Súhrnné karty ── */}

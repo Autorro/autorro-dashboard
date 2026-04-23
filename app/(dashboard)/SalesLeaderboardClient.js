@@ -87,7 +87,7 @@ export default function SalesLeaderboardClient() {
   const [expanded, setExpanded] = useState(null);
 
   /* ── Rola prihláseného používateľa ── */
-  const { role, pipedriveName } = useUser();
+  const { role } = useUser();
   const seeAll = canSeeAll(role); // admin alebo manažment → true
 
   useEffect(()=>{

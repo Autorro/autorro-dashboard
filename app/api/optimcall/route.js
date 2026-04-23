@@ -4,6 +4,8 @@ import WebSocket from "ws";
 import { randomUUID } from "crypto";
 
 const HOST = "autorealitka.m2.optimcall.cz";
+const OPTIMCALL_USER     = process.env.OPTIMCALL_USER     || "admin";
+const OPTIMCALL_PASSWORD = process.env.OPTIMCALL_PASSWORD || "";
 
 const NAVOLALA_KEY   = "03fcbb91323260625766779aee5b4589498069b4";
 const WASITLEAD_KEY  = "75d70860fca1d25d8ed8ac4c533979b62d93e1f6";
@@ -57,6 +59,9 @@ function nl(val) {
 // ── WebSocket: authenticate ────────────────────────────────────────────────────
 function wsAuth() {
   return new Promise((resolve, reject) => {
+    if (!OPTIMCALL_PASSWORD) {
+      return reject(new Error("OPTIMCALL_PASSWORD env var is not set"));
+    }
     const ws = new WebSocket(`wss://${HOST}/websocket`, { rejectUnauthorized: false });
     let authSent = false;
     const t = setTimeout(() => { ws.terminate(); reject(new Error("auth timeout")); }, 12000);
@@ -71,7 +76,7 @@ function wsAuth() {
         ws.send(JSON.stringify({
           _class:    "com.optimsys.costra.session.SessionChangeTrueIdentity",
           messageId: randomUUID(),
-          authToken: { _class: "com.optimsys.costra.identity.AuthorizeByNamePassword", name: "admin", password: "Autorro2024" },
+          authToken: { _class: "com.optimsys.costra.identity.AuthorizeByNamePassword", name: OPTIMCALL_USER, password: OPTIMCALL_PASSWORD },
           tenant:    { _class: "com.optimsys.costra.identity.TenantName", name: HOST },
         }));
         return;

@@ -9,6 +9,15 @@ const HOST = "autorealitka.m2.optimcall.cz";
 const OPTIMCALL_USER     = process.env.OPTIMCALL_USER     || "admin";
 const OPTIMCALL_PASSWORD = process.env.OPTIMCALL_PASSWORD || "";
 
+// Fail-fast guard: predtým default "" znamenalo že sme posielali prázdne heslo
+// do OptimCall a dostávali náhodné auth errory hlboko v call-stacku. Teraz
+// route explicitne vráti 503 ak env chýba — debuggovateľné a bezpečné.
+function requireOptimcallConfig() {
+  if (!OPTIMCALL_PASSWORD) {
+    throw new Error("OPTIMCALL_PASSWORD nie je nastavený vo Vercel env.");
+  }
+}
+
 // Pipedrive navolala option IDs that belong to telefonists (as strings)
 const TELEFONIST_IDS = new Set(["418", "419", "420", "421", "422", "935", "426"]);
 
@@ -341,6 +350,9 @@ export async function GET(request) {
   try {
     const user = await getServerUser();
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+    try { requireOptimcallConfig(); }
+    catch (e) { return Response.json({ ok: false, error: e.message }, { status: 503 }); }
 
     const { searchParams } = new URL(request.url);
     const dateFrom = searchParams.get("dateFrom") || new Date().toISOString().slice(0, 10);

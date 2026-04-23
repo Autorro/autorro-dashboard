@@ -1193,6 +1193,7 @@ export default function DashboardClient() {
               </button>
             </div>
           </div>
+          <div className="overflow-x-auto -mx-2 sm:mx-0">
           <table className="w-full text-sm">
               <thead className={theadCls} style={theadStyle}>
                 <tr>
@@ -1375,6 +1376,7 @@ export default function DashboardClient() {
                 })}
               </tbody>
             </table>
+            </div>
           </>}
         </>}
       </div>

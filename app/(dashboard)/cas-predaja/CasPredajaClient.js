@@ -207,6 +207,7 @@ export default function CasPredajaClient() {
             <h2 className="text-xl font-semibold mb-4">
               {office === "Všetky" ? "Všetci makléri" : "Makléri – " + office}
             </h2>
+          <div className="overflow-x-auto -mx-2 sm:mx-0">
           <table className="w-full text-sm">
               <thead className={theadCls} style={theadStyle}>
                 <tr>
@@ -319,6 +320,7 @@ export default function CasPredajaClient() {
                 })}
               </tbody>
             </table>
+            </div>
           </>
         )}
       </div>

@@ -118,8 +118,8 @@ export default function ZnackyClient() {
       </div>
 
       {/* Filtre + zoradenie */}
-      <div className="bg-white rounded-2xl shadow-sm p-4 flex flex-wrap gap-4 items-end">
-        <div className="flex flex-col gap-1.5 flex-1 min-w-[160px]">
+      <div className="bg-white rounded-2xl shadow-sm p-4 flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-4 sm:items-end">
+        <div className="flex flex-col gap-1.5 flex-1 sm:min-w-[160px]">
           <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Hľadaj značku</label>
           <input
             value={search} onChange={e=>setSearch(e.target.value)}

@@ -135,7 +135,7 @@ function DashboardLayoutInner({ children }) {
 
       {/* ── Mobile drawer ── */}
       <aside
-        className={`md:hidden fixed top-0 right-0 h-full w-72 z-40 flex flex-col p-5 transition-transform duration-300 ${menuOpen ? "translate-x-0" : "translate-x-full"}`}
+        className={`md:hidden fixed top-0 right-0 h-full w-72 max-w-[85vw] z-40 flex flex-col p-5 transition-transform duration-300 ${menuOpen ? "translate-x-0" : "translate-x-full"}`}
         style={{ backgroundColor: "#481132" }}
       >
         <div className="flex items-center justify-between mb-8">

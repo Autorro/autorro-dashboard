@@ -281,7 +281,7 @@ export default function SalesLeaderboardClient() {
           ))}
 
           {/* Vlastné – inline, bez skoku */}
-          <div className={`flex items-center gap-2 overflow-hidden transition-all duration-200 ${period==="Vlastné" ? "max-w-xs opacity-100" : "max-w-0 opacity-0 pointer-events-none"}`}>
+          <div className={`flex flex-wrap items-center gap-2 overflow-hidden transition-all duration-200 ${period==="Vlastné" ? "max-w-full opacity-100" : "max-w-0 opacity-0 pointer-events-none"}`}>
             {[{label:"Od",val:from,set:setFrom},{label:"Do",val:to,set:setTo}].map(f=>(
               <div key={f.label} className="flex items-center gap-1">
                 <span className="text-xs font-semibold text-gray-400">{f.label}</span>

@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase-server'
+import { getServerUser } from '@/lib/auth-server'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
@@ -7,6 +8,9 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
  */
 export async function GET(request) {
   try {
+    const user = await getServerUser()
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
     const { searchParams } = new URL(request.url)
     const from = searchParams.get('from')
     const to   = searchParams.get('to') || new Date().toISOString().split('T')[0]

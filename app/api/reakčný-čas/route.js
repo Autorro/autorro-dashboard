@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase-server'
 import { cache as dataCache } from '@/lib/cache'
+import { getServerUser } from '@/lib/auth-server'
 
 export const revalidate = 300
 
@@ -20,6 +21,9 @@ const getCachedReakcny = dataCache(fetchReakcnyData, 'reakčný-čas', 300)
 
 export async function GET(request) {
   try {
+    const user = await getServerUser()
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
     const { searchParams } = new URL(request.url)
     const force = searchParams.get('force') === '1'
 

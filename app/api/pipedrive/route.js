@@ -1,5 +1,10 @@
+import { getServerUser } from '@/lib/auth-server'
+
 export async function GET(request) {
   try {
+    const user = await getServerUser()
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
     const apiToken = process.env.PIPEDRIVE_API_TOKEN
     const { searchParams } = new URL(request.url)
 

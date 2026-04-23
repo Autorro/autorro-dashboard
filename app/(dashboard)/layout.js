@@ -176,10 +176,12 @@ function DashboardLayoutInner({ children }) {
 }
 
 export default function DashboardLayout({ children }) {
-  const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "").split(",");
+  // Admin rola sa riadi výlučne cez Supabase `app_metadata.role === 'admin'`.
+  // Predtým sme mali NEXT_PUBLIC_ADMIN_EMAILS fallback ktorý leakoval zoznam
+  // admin emailov do klientskeho JS bundla (phishing target list).
   return (
     <SWRProvider>
-      <UserProvider adminEmails={adminEmails}>
+      <UserProvider>
         <DashboardLayoutInner>{children}</DashboardLayoutInner>
       </UserProvider>
     </SWRProvider>

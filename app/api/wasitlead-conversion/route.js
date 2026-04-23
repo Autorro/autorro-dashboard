@@ -1,6 +1,7 @@
 import { fetchAllPages } from '@/lib/pipedrive'
 import { cache as dataCache } from '@/lib/cache'
 import { WASITLEAD_KEY, WASITLEAD_YES } from '@/lib/constants'
+import { getServerUser } from '@/lib/auth-server'
 
 export const revalidate = 600
 
@@ -33,6 +34,9 @@ const getCachedWasitlead = dataCache(fetchWasitleadData, 'wasitlead-conversion',
 
 export async function GET(request) {
   try {
+    const user = await getServerUser()
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
     const { searchParams } = new URL(request.url)
     const force = searchParams.get('force') === '1'
 

@@ -6,6 +6,7 @@ import {
   AUTOBAZAR_URL_KEY, AUTORRO_URL_KEY, INZEROVANE_OD_KEY,
   norm,
 } from '@/lib/constants'
+import { getServerUser } from '@/lib/auth-server'
 
 export const revalidate = 600
 
@@ -64,6 +65,9 @@ const getCachedZdravie = dataCache(fetchZdravieData, 'zdravie-ponuky', 600)
 
 export async function GET(request) {
   try {
+    const user = await getServerUser()
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
     const { searchParams } = new URL(request.url)
     const force = searchParams.get('force') === '1'
 

@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import WebSocket from "ws";
 import { randomUUID } from "crypto";
 import { NAVOLALA_KEY, WASITLEAD_KEY, WASITLEAD_YES as WASITLEAD_TRUE } from "@/lib/constants";
+import { getServerUser } from "@/lib/auth-server";
 
 const HOST = "autorealitka.m2.optimcall.cz";
 const OPTIMCALL_USER     = process.env.OPTIMCALL_USER     || "admin";
@@ -338,6 +339,9 @@ function getCachedOptimcall(dateFrom, dateTo) {
 // ── GET handler ────────────────────────────────────────────────────────────────
 export async function GET(request) {
   try {
+    const user = await getServerUser();
+    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
     const { searchParams } = new URL(request.url);
     const dateFrom = searchParams.get("dateFrom") || new Date().toISOString().slice(0, 10);
     const dateTo   = searchParams.get("dateTo")   || new Date().toISOString().slice(0, 10);

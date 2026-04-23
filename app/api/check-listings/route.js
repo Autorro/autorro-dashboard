@@ -9,6 +9,8 @@
  *  2. Ak HEAD zlyhá / vráti 405 → GET request s rovnakým timeoutom
  *  3. Detekcia: presmerovaný na homepage = neaktívny, 4xx = neaktívny
  */
+import { getServerUser } from '@/lib/auth-server'
+
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30 // Vercel: max 30s pre hobby
 
@@ -63,6 +65,9 @@ async function checkUrl(url) {
 
 export async function POST(request) {
   try {
+    const user = await getServerUser()
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
     const { urls } = await request.json()
     if (!Array.isArray(urls) || urls.length === 0) return Response.json({})
 

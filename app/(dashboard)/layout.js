@@ -1,29 +1,27 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { UserProvider, useUser, canSeeAll } from "../../lib/user-context";
+import { UserProvider } from "../../lib/user-context";
+import { createClient } from "../../lib/supabase";
+
+const HUB_URL = "https://app.autorro.sk";
 
 const NAV_ITEMS = [
-  { href: "/",                icon: "🏆", label: "Leaderboard predaja",      adminOnly: false },
-  { href: "/zdravie-ponuky",  icon: "🏥", label: "Zdravie ponuky",           adminOnly: false },
-  { href: "/reakčný-čas",    icon: "⚡", label: "Reakčný čas",              adminOnly: false },
-  { href: "/cas-predaja",     icon: "🕐", label: "Čas predaja",              adminOnly: false },
-  { href: "/znacky",          icon: "🚘", label: "Značky vozidiel",          adminOnly: false },
-  { href: "/konverzia",       icon: "🎯", label: "Konverzia leadov",          adminOnly: false },
-  { href: "/vyhodnotenie-callcentra", icon: "📞", label: "Vyhodnotenie callcentra", adminOnly: false },
-  { href: "/users",           icon: "👥", label: "Používatelia",              adminOnly: true  },
-  { href: "/zmena-hesla",     icon: "🔑", label: "Zmena hesla",              adminOnly: false },
+  { href: "/",                        icon: "🏆", label: "Leaderboard predaja" },
+  { href: "/zdravie-ponuky",          icon: "🏥", label: "Zdravie ponuky" },
+  { href: "/reakčný-čas",             icon: "⚡", label: "Reakčný čas" },
+  { href: "/cas-predaja",             icon: "🕐", label: "Čas predaja" },
+  { href: "/znacky",                  icon: "🚘", label: "Značky vozidiel" },
+  { href: "/konverzia",               icon: "🎯", label: "Konverzia leadov" },
+  { href: "/vyhodnotenie-callcentra", icon: "📞", label: "Vyhodnotenie callcentra" },
+  { href: "/zmena-hesla",             icon: "🔑", label: "Zmena hesla" },
 ];
 
 function NavItems({ onClick }) {
-  const { role } = useUser();
   return (
     <>
-      {NAV_ITEMS
-        .filter(item => !item.adminOnly || role === "admin")
-        .map(item => <NavLink key={item.href} {...item} onClick={onClick} />)
-      }
+      {NAV_ITEMS.map(item => <NavLink key={item.href} {...item} onClick={onClick} />)}
     </>
   );
 }
@@ -44,19 +42,31 @@ function NavLink({ href, icon, label, onClick }) {
   );
 }
 
+function HubLink({ onClick }) {
+  return (
+    <a
+      href={HUB_URL}
+      onClick={onClick}
+      className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[#F7F6F4] hover:bg-[#5c1a42] hover:text-white transition-colors"
+    >
+      <span className="text-lg w-6 text-center">↩️</span>
+      <span>Späť na hub</span>
+    </a>
+  );
+}
+
 function LogoutButton() {
-  const { createClient } = require("../../lib/supabase");
-  const router = require("next/navigation").useRouter();
-  const supabase = createClient();
+  const router = useRouter();
   async function handleLogout() {
+    const supabase = createClient();
     await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
+    // Po odhlásení rovno späť na hub login
+    window.location.href = `${HUB_URL}/login`;
   }
   return (
     <button
       onClick={handleLogout}
-      className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[#F7F6F4] hover:bg-red-900 hover:text-white transition-colors w-full mt-auto"
+      className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[#F7F6F4] hover:bg-red-900 hover:text-white transition-colors w-full"
     >
       <span className="text-lg w-6 text-center">🚪</span>
       <span>Odhlásiť sa</span>
@@ -92,7 +102,10 @@ function DashboardLayoutInner({ children }) {
         <nav className="flex flex-col gap-1 flex-1">
           <NavItems />
         </nav>
-        <LogoutButton />
+        <div className="flex flex-col gap-1 mt-auto pt-3 border-t border-[#5c1a42]">
+          <HubLink />
+          <LogoutButton />
+        </div>
       </aside>
 
       {/* ── Mobile top bar ── */}
@@ -135,7 +148,10 @@ function DashboardLayoutInner({ children }) {
         <nav className="flex flex-col gap-1 flex-1">
           <NavItems onClick={() => setMenuOpen(false)} />
         </nav>
-        <LogoutButton />
+        <div className="flex flex-col gap-1 mt-auto pt-3 border-t border-[#5c1a42]">
+          <HubLink onClick={() => setMenuOpen(false)} />
+          <LogoutButton />
+        </div>
       </aside>
 
       {/* ── Main content ── */}
